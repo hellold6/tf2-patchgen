@@ -516,6 +516,8 @@ Updated localization
     let lastPrompt = null; // completion prompt used for Regenerate
     let loadedModelId = null;
     let streamBuffer = ""; // seeded header + streamed continuation
+    let continueQueue = []; // huge: extra "\n\nSection\n-" prompts to append if too few bullets
+    let pendingContinues = 0;
 
     /* ============================================================
        Helpers
@@ -621,9 +623,20 @@ Updated localization
       const header =
         `Team Fortress 2 Update Released\n${dateLabel}\n\n`;
 
-      // Seed a first section so continuation stays in bullet style.
-      const seed =
-        length === "short" ? "Bug fixes\n-" : "Gameplay updates\n-";
+      // Seed so continuation stays in bullet style. Huge starts mid-list across sections.
+      let seed;
+      if (length === "short") {
+        seed = "Bug fixes\n-";
+      } else if (length === "huge") {
+        seed =
+          "Gameplay updates\n" +
+          "- Fixed \n" +
+          "- Added \n" +
+          "- Updated \n\n" +
+          "Weapons\n-";
+      } else {
+        seed = "Gameplay updates\n-";
+      }
 
       return cue + examples.join("\n\n") + "\n\n" + header + seed;
     }
@@ -633,6 +646,10 @@ Updated localization
       const marker = "Team Fortress 2 Update Released\n";
       const idx = prompt.lastIndexOf(marker);
       return idx >= 0 ? prompt.slice(idx) : prompt;
+    }
+
+    function countBullets(text) {
+      return (String(text).match(/^\s*[-•]/gm) || []).length;
     }
 
     /* ============================================================
@@ -705,9 +722,43 @@ Updated localization
         if (data.type === "done") {
           clearTimeout(stopTimer);
           stopTimer = null;
+          if (data.stopped) {
+            continueQueue = [];
+            pendingContinues = 0;
+            generating = false;
+            stopping = false;
+            setStatus("Stopped.", "ok");
+            updateActionButtons();
+            return;
+          }
+          // Huge length: if still thin on bullets, append the next section header and keep going.
+          if (continueQueue.length && countBullets(streamBuffer) < 10) {
+            const next = continueQueue.shift();
+            pendingContinues += 1;
+            streamBuffer += next;
+            els.output.value = streamBuffer;
+            setStatus("Generating… (continuing sections)");
+            const budget = LENGTH_TOKENS.huge;
+            worker.postMessage({
+              type: "generate",
+              text: streamBuffer, // continue from visible notes so far
+              settings: {
+                min_new_tokens: Math.min(120, budget.min_new_tokens),
+                max_new_tokens: 180,
+                temperature: Number(els.chaosSlider.value),
+                top_k: 40,
+                top_p: 0.95,
+                repetition_penalty: 1.15,
+                context: CONTEXT_TOKENS,
+              },
+            });
+            return;
+          }
+          continueQueue = [];
+          pendingContinues = 0;
           generating = false;
           stopping = false;
-          setStatus(data.stopped ? "Stopped." : "Ready.", "ok");
+          setStatus("Ready.", "ok");
           updateActionButtons();
         }
         if (data.type === "error") {
@@ -751,6 +802,12 @@ Updated localization
       els.output.value = streamBuffer;
       generating = true;
       stopping = false;
+      pendingContinues = 0;
+      // If the first pass drifts into prose, keep attaching section headers for huge.
+      continueQueue =
+        els.lengthSelect.value === "huge"
+          ? ["\n\nBug fixes\n-", "\n\nMaps\n-", "\n\nUpdated localization\n-"]
+          : [];
       setStatus("Generating…");
       updateActionButtons();
 
@@ -763,7 +820,7 @@ Updated localization
           temperature,
           top_k: 40,
           top_p: 0.95,
-          repetition_penalty: 1.1,
+          repetition_penalty: els.lengthSelect.value === "huge" ? 1.15 : 1.1,
           context: CONTEXT_TOKENS,
         },
       });
@@ -772,6 +829,7 @@ Updated localization
     function stopGenerate() {
       if (!worker || !generating || stopping) return;
       stopping = true;
+      continueQueue = [];
       setStatus("Stopping…");
       updateActionButtons();
       worker.postMessage({ type: "stop" });
