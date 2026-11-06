@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="Generate fictional Team Fortress 2-style patch notes in your browser." />
+  <meta name="theme-color" content="#c4541a" />
   <title>TF2 Patch Notes Generator</title>
   <style>
     /* ---- theme: follows prefers-color-scheme ---- */
@@ -21,6 +22,12 @@
       --shadow: 0 1px 3px rgba(0,0,0,.08);
       --font: "Segoe UI", system-ui, -apple-system, sans-serif;
       --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+      --tap: 44px; /* minimum tap target */
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --action-h: 56px; /* sticky action bar height (approx) */
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -40,25 +47,35 @@
 
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       font-family: var(--font);
       background: var(--bg);
       color: var(--fg);
       line-height: 1.45;
       min-height: 100vh;
+      min-height: 100dvh;
+      /* leave room for sticky action bar + home indicator */
+      padding-bottom: calc(var(--action-h) + var(--safe-bottom) + 12px);
+      overflow-x: hidden;
     }
     .wrap {
       max-width: 820px;
       margin: 0 auto;
-      padding: 1.25rem 1rem 3rem;
+      padding: calc(0.9rem + var(--safe-top)) calc(0.9rem + var(--safe-right)) 1rem calc(0.9rem + var(--safe-left));
+      width: 100%;
     }
     header h1 {
-      font-size: 1.55rem;
+      font-size: 1.35rem;
       margin: 0 0 .25rem;
       letter-spacing: -.01em;
+      line-height: 1.25;
+    }
+    @media (min-width: 600px) {
+      header h1 { font-size: 1.55rem; }
     }
     header p {
-      margin: 0 0 1.25rem;
+      margin: 0 0 1rem;
       color: var(--muted);
       font-size: .95rem;
     }
@@ -67,16 +84,17 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 1rem;
-      margin-bottom: 1rem;
+      padding: 0.9rem;
+      margin-bottom: 0.85rem;
       box-shadow: var(--shadow);
+      width: 100%;
     }
     .card h2 {
-      font-size: .85rem;
+      font-size: .8rem;
       text-transform: uppercase;
       letter-spacing: .04em;
       color: var(--muted);
-      margin: 0 0 .75rem;
+      margin: 0 0 .7rem;
       font-weight: 600;
     }
 
@@ -87,50 +105,81 @@
       color: var(--muted);
     }
     .field { margin-bottom: .85rem; }
+    /* Single column by default (mobile-first); two cols only on wider screens */
     .row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: .75rem;
     }
-    @media (max-width: 560px) {
-      .row { grid-template-columns: 1fr; }
+    @media (min-width: 600px) {
+      .row { grid-template-columns: 1fr 1fr; }
     }
 
+    /* 16px+ fonts so iOS Safari does not zoom on focus */
     input[type="text"],
     input[type="date"],
     select,
     textarea {
       width: 100%;
-      font: inherit;
+      max-width: 100%;
+      font-family: inherit;
+      font-size: 16px;
       color: var(--fg);
       background: var(--input);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: .55rem .65rem;
+      border-radius: 8px;
+      padding: .7rem .75rem;
+      min-height: var(--tap);
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    select {
+      background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 2rem;
     }
     textarea {
       font-family: var(--mono);
-      font-size: .88rem;
-      min-height: 280px;
+      font-size: 16px; /* keep 16px to avoid iOS zoom; mono still readable */
+      /* Fit in viewport: leave room for chrome + sticky bar */
+      min-height: 220px;
+      height: min(46vh, 420px);
+      max-height: 70vh;
       resize: vertical;
       line-height: 1.5;
       white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    input[type="range"] {
+      width: 100%;
+      height: var(--tap);
+      accent-color: var(--accent);
+    }
     .hint {
       font-size: .78rem;
       color: var(--muted);
-      margin-top: .2rem;
+      margin-top: .25rem;
+      line-height: 1.35;
     }
     .check {
       display: flex;
       align-items: center;
-      gap: .5rem;
-      font-size: .9rem;
+      gap: .6rem;
+      font-size: 1rem;
       color: var(--fg);
       margin: .5rem 0 0;
+      min-height: var(--tap);
     }
-    .check input { width: auto; accent-color: var(--accent); }
+    .check input {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+    }
 
     .btns {
       display: flex;
@@ -140,13 +189,16 @@
     }
     button {
       font: inherit;
-      font-size: .9rem;
-      border-radius: 6px;
+      font-size: 1rem;
+      border-radius: 8px;
       border: 1px solid var(--border);
       background: var(--input);
       color: var(--fg);
-      padding: .55rem .9rem;
+      padding: .7rem 1rem;
+      min-height: var(--tap);
+      min-width: var(--tap);
       cursor: pointer;
+      touch-action: manipulation;
     }
     button:hover:not(:disabled) { filter: brightness(1.05); }
     button:disabled { opacity: .45; cursor: not-allowed; }
@@ -160,6 +212,27 @@
       border-color: var(--danger);
       color: var(--danger);
     }
+
+    /* Sticky action bar — always reachable on phones */
+    .action-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      background: color-mix(in srgb, var(--card) 92%, transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-top: 1px solid var(--border);
+      padding: .55rem calc(0.75rem + var(--safe-right)) calc(0.55rem + var(--safe-bottom)) calc(0.75rem + var(--safe-left));
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+    }
+    .action-bar button { flex: 1 1 auto; }
+    .action-bar .primary,
+    .action-bar .danger { flex: 2 1 auto; }
 
     #status {
       font-size: .9rem;
@@ -176,9 +249,9 @@
     }
     .progress-wrap.visible { display: block; }
     .progress-bar {
-      height: 8px;
+      height: 10px;
       background: var(--border);
-      border-radius: 4px;
+      border-radius: 5px;
       overflow: hidden;
     }
     .progress-bar > span {
@@ -192,7 +265,21 @@
       font-size: .78rem;
       color: var(--muted);
       margin-top: .3rem;
+      word-break: break-word;
     }
+
+    .note {
+      display: none;
+      font-size: .85rem;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--accent) 10%, var(--card));
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .65rem .75rem;
+      margin: 0 0 .85rem;
+      line-height: 1.4;
+    }
+    .note.visible { display: block; }
 
     #nowebgpu {
       display: none;
@@ -205,13 +292,15 @@
     }
     #nowebgpu.visible { display: block; }
     #nowebgpu strong { color: var(--danger); }
+    #nowebgpu ul { margin: .4rem 0 0; padding-left: 1.2rem; }
 
     footer {
-      margin-top: 1.5rem;
+      margin-top: 1.25rem;
       font-size: .78rem;
       color: var(--muted);
       text-align: center;
       line-height: 1.5;
+      padding-bottom: .5rem;
     }
   </style>
 </head>
@@ -222,10 +311,16 @@
       <p>Fake but believable Team Fortress 2 update notes, written by a small LLM that runs entirely in your browser.</p>
     </header>
 
+    <div id="mobileNote" class="note" role="note">
+      On phones this defaults to the <strong>smallest</strong> model to save download size and GPU memory.
+      First load can be a few hundred MB (then cached). WebGPU needs recent <strong>Chrome on Android</strong>,
+      or <strong>Safari with WebGPU</strong>. If the tab crashes or runs out of memory, switch to the smaller model.
+    </div>
+
     <div id="nowebgpu" role="alert">
       <strong>WebGPU is not available in this browser.</strong>
       <p style="margin:.5rem 0 0">This app needs WebGPU to run the model locally. Try:</p>
-      <ul style="margin:.4rem 0 0; padding-left: 1.2rem">
+      <ul>
         <li>Chrome or Edge 113+ on desktop</li>
         <li>Recent Chrome on Android</li>
         <li>Safari 26+ (WebGPU enabled)</li>
@@ -238,7 +333,7 @@
       <div class="field">
         <label for="modelSelect">Model</label>
         <select id="modelSelect"></select>
-        <div class="hint">First load downloads the model (hundreds of MB). After that it is cached by the browser.</div>
+        <div class="hint" id="modelHint">First load downloads the model (hundreds of MB). After that it is cached by the browser.</div>
       </div>
       <div class="btns">
         <button type="button" id="loadBtn" class="primary">Load model</button>
@@ -268,7 +363,7 @@
       </div>
       <div class="field">
         <label for="focusInput">Focus (optional)</label>
-        <input type="text" id="focusInput" placeholder="e.g. Scout, Stickybomb Launcher, Dustbowl" />
+        <input type="text" id="focusInput" placeholder="e.g. Scout, Stickybomb Launcher, Dustbowl" autocomplete="off" />
         <div class="hint">Comma-separated classes, weapons, or maps to lean on.</div>
       </div>
       <div class="field">
@@ -282,14 +377,12 @@
       </label>
     </section>
 
-    <section class="card">
+    <section class="card" id="notesCard">
       <h2>Patch notes</h2>
       <div class="btns" style="margin-bottom:.75rem">
-        <button type="button" id="generateBtn" class="primary" disabled>Generate</button>
-        <button type="button" id="regenerateBtn" disabled>Regenerate</button>
-        <button type="button" id="stopBtn" class="danger" disabled>Stop</button>
         <button type="button" id="copyBtn" disabled>Copy</button>
         <button type="button" id="clearBtn" disabled>Clear</button>
+        <button type="button" id="regenerateBtn" disabled>Regenerate</button>
       </div>
       <textarea id="output" spellcheck="false" placeholder="Generated notes will appear here. You can edit them freely."></textarea>
     </section>
@@ -300,19 +393,27 @@
     </footer>
   </div>
 
+  <!-- Sticky primary actions for mobile reachability -->
+  <div class="action-bar" role="toolbar" aria-label="Generation controls">
+    <button type="button" id="generateBtn" class="primary" disabled>Generate</button>
+    <button type="button" id="stopBtn" class="danger" disabled>Stop</button>
+  </div>
+
   <script type="module">
     /* ============================================================
        CONFIG — change these to swap models or rename the app
        ============================================================ */
 
-    // Default model id (must exist in WebLLM prebuiltAppConfig.model_list)
+    // Default model id on desktop (must exist in WebLLM prebuiltAppConfig.model_list)
     const DEFAULT_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+    // Preferred default on phones / coarse-pointer / low-memory devices
+    const SMALL_MODEL = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
 
     // Dropdown options: smaller + default + larger
     const MODEL_OPTIONS = [
-      { id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", label: "Qwen2.5 0.5B (smaller, faster)" },
-      { id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", label: "Qwen2.5 1.5B (default)" },
-      { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", label: "Llama 3.2 3B (larger, slower)" },
+      { id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", label: "Qwen2.5 0.5B (smaller, faster)", approxMB: "~270 MB" },
+      { id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", label: "Qwen2.5 1.5B (default)", approxMB: "~1 GB" },
+      { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", label: "Llama 3.2 3B (larger, slower)", approxMB: "~2 GB" },
     ];
 
     // Pinned WebLLM version (jsDelivr ESM)
@@ -334,7 +435,6 @@ Use only these section names when needed: Gameplay updates, Weapons, Bug fixes, 
 Never claim this is an official Valve update. Never wrap the notes in markdown code fences.
 Output ONLY the patch notes text — no preamble, no closing commentary.`;
 
-    // Original examples written for this project (not copied from real notes)
     const FEW_SHOTS = [
       {
         user: "Write a normal TF2 update for 2024-03-12. Focus: Soldier, Rocket Launcher. Include a joke entry or two. Tone: serious.",
@@ -410,12 +510,14 @@ Updated localization
     const $ = (id) => document.getElementById(id);
     const els = {
       modelSelect: $("modelSelect"),
+      modelHint: $("modelHint"),
       loadBtn: $("loadBtn"),
       progressWrap: $("progressWrap"),
       progressBar: $("progressBar"),
       progressText: $("progressText"),
       status: $("status"),
       nowebgpu: $("nowebgpu"),
+      mobileNote: $("mobileNote"),
       updateDate: $("updateDate"),
       lengthSelect: $("lengthSelect"),
       focusInput: $("focusInput"),
@@ -433,11 +535,11 @@ Updated localization
     /* ============================================================
        State
        ============================================================ */
-    let webllm = null;       // module namespace after import
-    let engine = null;       // MLCEngine instance
+    let webllm = null;
+    let engine = null;
     let loadedModelId = null;
     let generating = false;
-    let lastUserPrompt = null; // for Regenerate
+    let lastUserPrompt = null;
 
     /* ============================================================
        Helpers
@@ -457,7 +559,6 @@ Updated localization
     }
 
     function formatDateLabel(iso) {
-      // "2026-11-06" → "November 6, 2026"
       try {
         const [y, m, d] = iso.split("-").map(Number);
         const dt = new Date(y, m - 1, d);
@@ -471,10 +572,7 @@ Updated localization
       }
     }
 
-    function chaosToTemp(v) {
-      // slider already IS temperature 0.3–1.2
-      return Number(v);
-    }
+    function chaosToTemp(v) { return Number(v); }
 
     function toneWord(temp) {
       if (temp <= 0.45) return "serious and dry";
@@ -488,22 +586,18 @@ Updated localization
       const focus = els.focusInput.value.trim();
       const jokes = els.jokeCheck.checked;
       const temp = chaosToTemp(els.chaosSlider.value);
-
       const lengthLabel =
         length === "short" ? "short hotfix" :
         length === "huge" ? "huge update" : "normal update";
-
       let prompt = `Write a ${lengthLabel} TF2 update for ${formatDateLabel(iso)}.`;
       if (focus) prompt += ` Focus: ${focus}.`;
-      prompt += jokes
-        ? " Include a joke entry or two."
-        : " Do not include joke entries.";
+      prompt += jokes ? " Include a joke entry or two." : " Do not include joke entries.";
       prompt += ` Tone: ${toneWord(temp)}.`;
       return prompt;
     }
 
     function savePref(key, value) {
-      try { localStorage.setItem(key, value); } catch (_) { /* ignore */ }
+      try { localStorage.setItem(key, value); } catch (_) {}
     }
     function loadPref(key, fallback) {
       try {
@@ -512,6 +606,51 @@ Updated localization
       } catch (_) {
         return fallback;
       }
+    }
+
+    /** Detect phones / coarse pointers / low-memory devices for smaller default. */
+    function isMobileLike() {
+      try {
+        if (typeof matchMedia === "function") {
+          if (matchMedia("(pointer: coarse)").matches) return true;
+          if (matchMedia("(max-width: 700px)").matches) return true;
+        }
+      } catch (_) {}
+      try {
+        if (typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4) return true;
+      } catch (_) {}
+      try {
+        const ua = navigator.userAgent || "";
+        if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+      } catch (_) {}
+      return false;
+    }
+
+    function friendlyGpuError(err) {
+      const msg = String(err && err.message ? err.message : err || "");
+      const lower = msg.toLowerCase();
+      if (
+        /out of memory|oom|device lost|devicelost|insufficient|vram|gpu.*?lost|memory.*?limit/i.test(lower) ||
+        /Device lost/i.test(msg)
+      ) {
+        return (
+          "This device ran out of GPU memory loading that model. " +
+          "Pick the smaller Qwen2.5 0.5B model and try Load again. " +
+          "Closing other tabs can also help."
+        );
+      }
+      if (/webgpu|adapter|gpu/i.test(lower) && /not|unavail|fail|support/i.test(lower)) {
+        return "WebGPU failed on this device. Try recent Chrome on Android, or Safari with WebGPU enabled.";
+      }
+      return msg || "Unknown error";
+    }
+
+    function updateModelHint() {
+      const id = els.modelSelect.value;
+      const opt = MODEL_OPTIONS.find((o) => o.id === id);
+      const size = opt ? opt.approxMB : "hundreds of MB";
+      els.modelHint.textContent =
+        `First load downloads about ${size}. After that it is cached by the browser.`;
     }
 
     /* ============================================================
@@ -557,8 +696,16 @@ Updated localization
       els.regenerateBtn.disabled = true;
       setStatus("Loading model…");
 
+      // Surface device-lost mid-load if the browser fires it
+      let lostMsg = null;
+      const onLost = (ev) => {
+        lostMsg = (ev && ev.reason) || "WebGPU device lost";
+      };
+      try {
+        // Best-effort: some browsers expose gpu.onuncapturederror later on the device
+      } catch (_) {}
+
       const initProgressCallback = (report) => {
-        // report.progress is 0..1
         const pct = Math.max(0, Math.min(100, Math.round((report.progress || 0) * 100)));
         els.progressBar.style.width = pct + "%";
         els.progressText.textContent = report.text || (pct + "%");
@@ -566,9 +713,8 @@ Updated localization
       };
 
       try {
-        // Recreate engine when switching models so VRAM is released cleanly
         if (engine) {
-          try { await engine.unload(); } catch (_) { /* ignore */ }
+          try { await engine.unload(); } catch (_) {}
           engine = null;
           loadedModelId = null;
         }
@@ -577,6 +723,15 @@ Updated localization
         loadedModelId = modelId;
         savePref("tf2pg_model", modelId);
 
+        // Attach device-lost handler on the engine's GPU device if exposed
+        try {
+          if (engine && engine.gpuDevice && typeof engine.gpuDevice.addEventListener === "function") {
+            engine.gpuDevice.addEventListener("uncapturederror", (e) => {
+              console.warn("WebGPU uncaptured error", e);
+            });
+          }
+        } catch (_) {}
+
         els.progressBar.style.width = "100%";
         els.progressText.textContent = "Model ready (cached for next visit).";
         setStatus("Ready.", "ok");
@@ -584,10 +739,17 @@ Updated localization
         els.regenerateBtn.disabled = !lastUserPrompt;
       } catch (err) {
         console.error(err);
-        setStatus("Failed to load model: " + (err && err.message ? err.message : err), "error");
+        const friendly = friendlyGpuError(err);
+        setStatus("Failed to load model: " + friendly, "error");
+        // If they tried a larger model, nudge the dropdown toward the small one
+        if (/GPU memory|smaller Qwen/i.test(friendly)) {
+          els.modelSelect.value = SMALL_MODEL;
+          updateModelHint();
+        }
         throw err;
       } finally {
         els.loadBtn.disabled = false;
+        void lostMsg;
       }
     }
 
@@ -600,10 +762,7 @@ Updated localization
       const userPrompt = isRegen && lastUserPrompt ? lastUserPrompt : buildUserPrompt();
       lastUserPrompt = userPrompt;
 
-      const messages = [
-        { role: "system", content: SYSTEM_PROMPT },
-      ];
-      // few-shot pairs
+      const messages = [{ role: "system", content: SYSTEM_PROMPT }];
       for (const ex of FEW_SHOTS) {
         messages.push({ role: "user", content: ex.user });
         messages.push({ role: "assistant", content: ex.assistant });
@@ -628,10 +787,8 @@ Updated localization
           stream: true,
           temperature: temp,
           max_tokens: maxTokens,
-          // Penalties to reduce copy-paste loops in long notes
           frequency_penalty: 0.4,
           presence_penalty: 0.3,
-          // Also set repetition_penalty when supported by the runtime
           repetition_penalty: 1.05,
         });
 
@@ -641,19 +798,17 @@ Updated localization
           if (delta) {
             full += delta;
             els.output.value = full;
-            // keep scrolled to bottom while streaming
             els.output.scrollTop = els.output.scrollHeight;
           }
         }
         setStatus("Ready.", "ok");
       } catch (err) {
-        // interruptGenerate() typically rejects the stream — treat as a soft stop
         const msg = String(err && err.message ? err.message : err);
         if (/interrup/i.test(msg) || /abort/i.test(msg) || /cancel/i.test(msg)) {
           setStatus("Stopped.", "ok");
         } else {
           console.error(err);
-          setStatus("Generation failed: " + msg, "error");
+          setStatus("Generation failed: " + friendlyGpuError(err), "error");
         }
       } finally {
         generating = false;
@@ -678,8 +833,13 @@ Updated localization
        Wire up UI
        ============================================================ */
     function initUI() {
-      // Fill model dropdown
-      const preferred = loadPref("tf2pg_model", DEFAULT_MODEL);
+      const mobile = isMobileLike();
+      if (mobile) els.mobileNote.classList.add("visible");
+
+      // Prefer saved choice; otherwise smallest on mobile, DEFAULT on desktop
+      const fallback = mobile ? SMALL_MODEL : DEFAULT_MODEL;
+      const preferred = loadPref("tf2pg_model", fallback);
+
       for (const opt of MODEL_OPTIONS) {
         const o = document.createElement("option");
         o.value = opt.id;
@@ -687,10 +847,11 @@ Updated localization
         if (opt.id === preferred) o.selected = true;
         els.modelSelect.appendChild(o);
       }
-      // If preferred wasn't in the list, select DEFAULT
       if (![...els.modelSelect.options].some((o) => o.selected)) {
-        els.modelSelect.value = DEFAULT_MODEL;
+        els.modelSelect.value = fallback;
       }
+      updateModelHint();
+      els.modelSelect.addEventListener("change", updateModelHint);
 
       els.updateDate.value = todayISO();
       els.chaosLabel.textContent = Number(els.chaosSlider.value).toFixed(2);
@@ -700,9 +861,7 @@ Updated localization
       });
 
       els.loadBtn.addEventListener("click", async () => {
-        try {
-          await loadModel(els.modelSelect.value);
-        } catch (_) { /* status already set */ }
+        try { await loadModel(els.modelSelect.value); } catch (_) {}
       });
 
       els.generateBtn.addEventListener("click", () => generate(false));
@@ -714,7 +873,6 @@ Updated localization
           await navigator.clipboard.writeText(els.output.value);
           setStatus("Copied to clipboard.", "ok");
         } catch {
-          // fallback
           els.output.select();
           try { document.execCommand("copy"); setStatus("Copied.", "ok"); }
           catch { setStatus("Copy failed — select the text manually.", "error"); }
@@ -735,7 +893,6 @@ Updated localization
       });
     }
 
-    // Boot
     initUI();
     checkWebGPU().then((gpu) => {
       if (!gpu.ok) {

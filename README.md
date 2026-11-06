@@ -14,6 +14,13 @@ All notes are made up. This project is not affiliated with Valve Corporation.
 | `.nojekyll` | Tells GitHub Pages not to run Jekyll. |
 | `README.md` | This file. |
 
+## Mobile
+
+The layout is mobile-first: single column, ≥44px tap targets, 16px inputs (no iOS zoom),
+safe-area padding, and a sticky Generate / Stop bar. On phones (coarse pointer, narrow
+viewport, or low `deviceMemory`) the model dropdown defaults to **Qwen2.5 0.5B**.
+Out-of-memory / device-lost errors suggest switching to that smaller model.
+
 ## Requirements
 
 - A browser with **WebGPU**:
