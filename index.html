@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="Generate fictional Team Fortress 2-style patch notes in your browser." />
+  <meta name="description" content="Generate fictional Team Fortress 2-style patch notes in your browser with GPT-2." />
   <meta name="theme-color" content="#c4541a" />
   <title>TF2 Patch Notes Generator</title>
   <style>
-    /* ---- theme: follows prefers-color-scheme ---- */
     :root {
       --bg: #f4f1ea;
       --fg: #1a1a1a;
@@ -22,12 +21,12 @@
       --shadow: 0 1px 3px rgba(0,0,0,.08);
       --font: "Segoe UI", system-ui, -apple-system, sans-serif;
       --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
-      --tap: 44px; /* minimum tap target */
+      --tap: 44px;
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-right: env(safe-area-inset-right, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-left: env(safe-area-inset-left, 0px);
-      --action-h: 72px; /* fixed action bar height; JS may raise this */
+      --action-h: 72px;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -55,7 +54,6 @@
       line-height: 1.45;
       min-height: 100vh;
       min-height: 100dvh;
-      /* leave room so nothing scrolls under the fixed action bar */
       padding-bottom: 0;
       overflow-x: hidden;
     }
@@ -65,7 +63,6 @@
       padding: calc(0.9rem + var(--safe-top)) calc(0.9rem + var(--safe-right)) 1rem calc(0.9rem + var(--safe-left));
       width: 100%;
     }
-    /* Invisible spacer: reserves scroll room equal to the fixed bar */
     .action-bar-spacer {
       width: 100%;
       height: calc(var(--action-h) + var(--safe-bottom) + 16px);
@@ -112,7 +109,6 @@
       color: var(--muted);
     }
     .field { margin-bottom: .85rem; }
-    /* Single column by default (mobile-first); two cols only on wider screens */
     .row {
       display: grid;
       grid-template-columns: 1fr;
@@ -122,7 +118,6 @@
       .row { grid-template-columns: 1fr 1fr; }
     }
 
-    /* 16px+ fonts so iOS Safari does not zoom on focus */
     input[type="text"],
     input[type="date"],
     select,
@@ -150,8 +145,7 @@
     }
     textarea {
       font-family: var(--mono);
-      font-size: 16px; /* keep 16px to avoid iOS zoom; mono still readable */
-      /* Fit in viewport: leave room for chrome + sticky bar */
+      font-size: 16px;
       min-height: 220px;
       height: min(46vh, 420px);
       max-height: 70vh;
@@ -220,14 +214,12 @@
       color: var(--danger);
     }
 
-    /* Fixed bottom action bar — out of document flow, never overlaps mid-page */
     .action-bar {
       position: fixed;
       left: 0;
       right: 0;
       bottom: 0;
       z-index: 1000;
-      /* Solid (not translucent) so content underneath cannot show through */
       background: var(--card);
       border-top: 1px solid var(--border);
       padding: .6rem calc(0.75rem + var(--safe-right)) calc(0.6rem + var(--safe-bottom)) calc(0.75rem + var(--safe-left));
@@ -236,7 +228,6 @@
       flex-wrap: nowrap;
       align-items: stretch;
       box-shadow: 0 -6px 20px rgba(0,0,0,.12);
-      /* Keep bar itself out of the scrollable layout */
       margin: 0;
     }
     .action-bar button {
@@ -294,19 +285,6 @@
     }
     .note.visible { display: block; }
 
-    #nowebgpu {
-      display: none;
-      border: 1px solid var(--danger);
-      background: color-mix(in srgb, var(--danger) 12%, var(--card));
-      color: var(--fg);
-      border-radius: 10px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    #nowebgpu.visible { display: block; }
-    #nowebgpu strong { color: var(--danger); }
-    #nowebgpu ul { margin: .4rem 0 0; padding-left: 1.2rem; }
-
     footer {
       margin-top: 1.25rem;
       font-size: .78rem;
@@ -321,24 +299,13 @@
   <div class="wrap">
     <header>
       <h1>TF2 Patch Notes Generator</h1>
-      <p>Fake but believable Team Fortress 2 update notes, written by a small LLM that runs entirely in your browser.</p>
+      <p>Fake but believable Team Fortress 2 update notes, continued by GPT-2 running entirely in your browser.</p>
     </header>
 
     <div id="mobileNote" class="note" role="note">
-      On phones this defaults to the <strong>smallest</strong> model to save download size and GPU memory.
-      First load can be a few hundred MB (then cached). WebGPU needs recent <strong>Chrome on Android</strong>,
-      or <strong>Safari with WebGPU</strong>. If the tab crashes or runs out of memory, switch to the smaller model.
-    </div>
-
-    <div id="nowebgpu" role="alert">
-      <strong>WebGPU is not available in this browser.</strong>
-      <p style="margin:.5rem 0 0">This app needs WebGPU to run the model locally. Try:</p>
-      <ul>
-        <li>Chrome or Edge 113+ on desktop</li>
-        <li>Recent Chrome on Android</li>
-        <li>Safari 26+ (WebGPU enabled)</li>
-        <li>Firefox with <code>dom.webgpu.enabled</code> turned on in about:config</li>
-      </ul>
+      On phones this defaults to <strong>DistilGPT-2</strong> to keep the first download smaller.
+      Expect tens to a few hundred MB the first time (then cached). Older phones may be slow —
+      if something runs out of memory, stick with DistilGPT-2.
     </div>
 
     <section class="card">
@@ -346,7 +313,7 @@
       <div class="field">
         <label for="modelSelect">Model</label>
         <select id="modelSelect"></select>
-        <div class="hint" id="modelHint">First load downloads the model (hundreds of MB). After that it is cached by the browser.</div>
+        <div class="hint" id="modelHint">First load downloads the model. After that it is cached by the browser when storage is available.</div>
       </div>
       <div class="btns">
         <button type="button" id="loadBtn" class="primary">Load model</button>
@@ -404,11 +371,9 @@
       All notes are fictional and generated for fun.<br />
       This project is not affiliated with Valve Corporation or Team Fortress 2.
     </footer>
-    <!-- Pushes last content above the fixed Generate/Stop bar when scrolled to end -->
     <div class="action-bar-spacer" aria-hidden="true"></div>
   </div>
 
-  <!-- Fixed bottom actions — position:fixed so they never sit mid-form -->
   <div class="action-bar" id="actionBar" role="toolbar" aria-label="Generation controls">
     <button type="button" id="generateBtn" class="primary" disabled>Generate</button>
     <button type="button" id="stopBtn" class="danger" disabled>Stop</button>
@@ -416,44 +381,31 @@
 
   <script type="module">
     /* ============================================================
-       CONFIG — change these to swap models or rename the app
+       CONFIG — change MODEL_OPTIONS / DEFAULT_MODEL to swap models
        ============================================================ */
 
-    // Default model id on desktop (must exist in WebLLM prebuiltAppConfig.model_list)
-    const DEFAULT_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
-    // Preferred default on phones / coarse-pointer / low-memory devices
-    const SMALL_MODEL = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+    // Desktop default (Xenova GPT-2 small, q8 WASM)
+    const DEFAULT_MODEL = "Xenova/gpt2";
+    // Preferred on phones / coarse pointer / low memory
+    const SMALL_MODEL = "Xenova/distilgpt2";
 
-    // Dropdown options: smaller + default + larger
     const MODEL_OPTIONS = [
-      { id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", label: "Qwen2.5 0.5B (smaller, faster)", approxMB: "~270 MB" },
-      { id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", label: "Qwen2.5 1.5B (default)", approxMB: "~1 GB" },
-      { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", label: "Llama 3.2 3B (larger, slower)", approxMB: "~2 GB" },
+      { id: "Xenova/distilgpt2", label: "DistilGPT-2 (smaller, faster)", approxMB: "~85 MB" },
+      { id: "Xenova/gpt2", label: "GPT-2 small (default)", approxMB: "~130 MB" },
+      { id: "Xenova/gpt2-medium", label: "GPT-2 medium (larger, slower)", approxMB: "~350 MB" },
     ];
 
-    // Pinned WebLLM version (jsDelivr ESM)
-    const WEBLLM_URL = "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.87/+esm";
+    // Length → max_new_tokens (leave room in GPT-2's 1024 context for the prompt)
+    const LENGTH_TOKENS = { short: 120, normal: 220, huge: 360 };
 
-    // Length → max_tokens
-    const LENGTH_TOKENS = { short: 280, normal: 550, huge: 900 };
+    // How many of the most recent prompt tokens to keep (worker also caps by 1024 - max_new_tokens)
+    const CONTEXT_TOKENS = 768;
 
     /* ============================================================
-       PROMPTS — original few-shots (do not copy real Valve notes)
+       Few-shot documents (original; not copied from real Valve notes)
        ============================================================ */
 
-    const SYSTEM_PROMPT = `You are a writer for fictional Team Fortress 2 patch notes.
-Write in Valve's classic TF2 update style: dry, past-tense, short bullet lines.
-Start every response with exactly:
-Team Fortress 2 Update Released
-then a date line, then section headers followed by bullets that begin with Fixed, Added, Updated, Changed, Improved, or Removed.
-Use only these section names when needed: Gameplay updates, Weapons, Bug fixes, Maps, Updated localization.
-Never claim this is an official Valve update. Never wrap the notes in markdown code fences.
-Output ONLY the patch notes text — no preamble, no closing commentary.`;
-
-    const FEW_SHOTS = [
-      {
-        user: "Write a normal TF2 update for 2024-03-12. Focus: Soldier, Rocket Launcher. Include a joke entry or two. Tone: serious.",
-        assistant: `Team Fortress 2 Update Released
+    const EXAMPLE_NORMAL = `Team Fortress 2 Update Released
 March 12, 2024
 
 Gameplay updates
@@ -473,11 +425,9 @@ Maps
 - Updated Dustbowl: plugged a tiny gap behind RED's second-stage battlements
 
 Updated localization
-- Added community translations for the new rocket misfire quip`,
-      },
-      {
-        user: "Write a short hotfix TF2 update for 2025-07-01. Focus: Engineer, Wrangler. Tone: serious.",
-        assistant: `Team Fortress 2 Update Released
+- Added community translations for the new rocket misfire quip`;
+
+    const EXAMPLE_HOTFIX = `Team Fortress 2 Update Released
 July 1, 2025
 
 Bug fixes
@@ -486,11 +436,9 @@ Bug fixes
 - Fixed a crash when picking up a Toolbox while holding the Wrangler
 
 Updated localization
-- Corrected a typo in the Wrangler kill feed string`,
-      },
-      {
-        user: "Write a huge TF2 update for 2023-11-28. Focus: Spy, Knife, Turbine. Include a joke entry or two. Tone: a bit unhinged.",
-        assistant: `Team Fortress 2 Update Released
+- Corrected a typo in the Wrangler kill feed string`;
+
+    const EXAMPLE_HUGE = `Team Fortress 2 Update Released
 November 28, 2023
 
 Gameplay updates
@@ -515,12 +463,10 @@ Maps
 
 Updated localization
 - Added translations for the Spy's rare apology line
-- Fixed an Italian string that accidentally called the Knife a spoon`,
-      },
-    ];
+- Fixed an Italian string that accidentally called the Knife a spoon`;
 
     /* ============================================================
-       DOM refs
+       DOM
        ============================================================ */
     const $ = (id) => document.getElementById(id);
     const els = {
@@ -531,7 +477,6 @@ Updated localization
       progressBar: $("progressBar"),
       progressText: $("progressText"),
       status: $("status"),
-      nowebgpu: $("nowebgpu"),
       mobileNote: $("mobileNote"),
       updateDate: $("updateDate"),
       lengthSelect: $("lengthSelect"),
@@ -550,11 +495,14 @@ Updated localization
     /* ============================================================
        State
        ============================================================ */
-    let webllm = null;
-    let engine = null;
-    let loadedModelId = null;
+    let worker = null;
+    let ready = false;
     let generating = false;
-    let lastUserPrompt = null;
+    let stopping = false;
+    let stopTimer = null;
+    let lastPrompt = null; // completion prompt used for Regenerate
+    let loadedModelId = null;
+    let streamBuffer = ""; // seeded header + streamed continuation
 
     /* ============================================================
        Helpers
@@ -567,48 +515,18 @@ Updated localization
 
     function todayISO() {
       const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     }
 
     function formatDateLabel(iso) {
       try {
         const [y, m, d] = iso.split("-").map(Number);
-        const dt = new Date(y, m - 1, d);
-        return dt.toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
+        return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+          year: "numeric", month: "long", day: "numeric",
         });
       } catch {
         return iso;
       }
-    }
-
-    function chaosToTemp(v) { return Number(v); }
-
-    function toneWord(temp) {
-      if (temp <= 0.45) return "serious and dry";
-      if (temp <= 0.85) return "classic Valve dry humor";
-      return "a bit unhinged, still past-tense patch-note style";
-    }
-
-    function buildUserPrompt() {
-      const iso = els.updateDate.value || todayISO();
-      const length = els.lengthSelect.value;
-      const focus = els.focusInput.value.trim();
-      const jokes = els.jokeCheck.checked;
-      const temp = chaosToTemp(els.chaosSlider.value);
-      const lengthLabel =
-        length === "short" ? "short hotfix" :
-        length === "huge" ? "huge update" : "normal update";
-      let prompt = `Write a ${lengthLabel} TF2 update for ${formatDateLabel(iso)}.`;
-      if (focus) prompt += ` Focus: ${focus}.`;
-      prompt += jokes ? " Include a joke entry or two." : " Do not include joke entries.";
-      prompt += ` Tone: ${toneWord(temp)}.`;
-      return prompt;
     }
 
     function savePref(key, value) {
@@ -623,7 +541,10 @@ Updated localization
       }
     }
 
-    /** Detect phones / coarse pointers / low-memory devices for smaller default. */
+    function isKnownModel(id) {
+      return MODEL_OPTIONS.some((o) => o.id === id);
+    }
+
     function isMobileLike() {
       try {
         if (typeof matchMedia === "function") {
@@ -635,225 +556,233 @@ Updated localization
         if (typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4) return true;
       } catch (_) {}
       try {
-        const ua = navigator.userAgent || "";
-        if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+        if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "")) return true;
       } catch (_) {}
       return false;
     }
 
-    function friendlyGpuError(err) {
-      const msg = String(err && err.message ? err.message : err || "");
-      const lower = msg.toLowerCase();
-      if (
-        /out of memory|oom|device lost|devicelost|insufficient|vram|gpu.*?lost|memory.*?limit/i.test(lower) ||
-        /Device lost/i.test(msg)
-      ) {
-        return (
-          "This device ran out of GPU memory loading that model. " +
-          "Pick the smaller Qwen2.5 0.5B model and try Load again. " +
-          "Closing other tabs can also help."
-        );
-      }
-      if (/webgpu|adapter|gpu/i.test(lower) && /not|unavail|fail|support/i.test(lower)) {
-        return "WebGPU failed on this device. Try recent Chrome on Android, or Safari with WebGPU enabled.";
-      }
-      return msg || "Unknown error";
-    }
-
     function updateModelHint() {
-      const id = els.modelSelect.value;
-      const opt = MODEL_OPTIONS.find((o) => o.id === id);
-      const size = opt ? opt.approxMB : "hundreds of MB";
+      const opt = MODEL_OPTIONS.find((o) => o.id === els.modelSelect.value);
+      const size = opt ? opt.approxMB : "tens to a few hundred MB";
       els.modelHint.textContent =
-        `First load downloads about ${size}. After that it is cached by the browser.`;
+        `First load downloads about ${size}. After that it is cached by the browser when storage is available.`;
+    }
+
+    function updateActionButtons() {
+      els.generateBtn.disabled = !ready || generating;
+      els.regenerateBtn.disabled = !ready || generating || !lastPrompt;
+      els.stopBtn.disabled = !generating || stopping;
+      els.loadBtn.disabled = generating;
+      const has = !!els.output.value;
+      els.copyBtn.disabled = !has || generating;
+      els.clearBtn.disabled = !has || generating;
+    }
+
+    /* Build a plain completion prompt: few-shot docs, then the new header. */
+    function buildCompletionPrompt() {
+      const iso = els.updateDate.value || todayISO();
+      const dateLabel = formatDateLabel(iso);
+      const length = els.lengthSelect.value;
+      const focus = els.focusInput.value.trim();
+      const jokes = els.jokeCheck.checked;
+
+      // Pick examples that match the chosen length so the model continues the pattern.
+      let examples;
+      if (length === "short") examples = [EXAMPLE_HOTFIX];
+      else if (length === "huge") examples = [EXAMPLE_NORMAL, EXAMPLE_HUGE];
+      else examples = [EXAMPLE_HOTFIX, EXAMPLE_NORMAL];
+
+      // Light natural-language cue GPT-2 can imitate (kept short; format is shown by examples).
+      let cue = `// Another ${length === "short" ? "short hotfix" : length === "huge" ? "huge" : "normal"} Team Fortress 2 update`;
+      if (focus) cue += ` focusing on ${focus}`;
+      if (jokes) cue += ` with a joke entry or two`;
+      cue += ".\n\n";
+
+      const header =
+        `Team Fortress 2 Update Released\n${dateLabel}\n\n`;
+
+      // Seed a first section so continuation stays in bullet style.
+      const seed =
+        length === "short" ? "Bug fixes\n-" : "Gameplay updates\n-";
+
+      return cue + examples.join("\n\n") + "\n\n" + header + seed;
+    }
+
+    /* The visible notes start at the final "Team Fortress 2 Update Released" header. */
+    function visibleSeedFromPrompt(prompt) {
+      const marker = "Team Fortress 2 Update Released\n";
+      const idx = prompt.lastIndexOf(marker);
+      return idx >= 0 ? prompt.slice(idx) : prompt;
     }
 
     /* ============================================================
-       WebGPU check
+       Worker lifecycle
        ============================================================ */
-    async function checkWebGPU() {
-      if (!navigator.gpu) return { ok: false, reason: "navigator.gpu is missing" };
-      try {
-        const adapter = await navigator.gpu.requestAdapter();
-        if (!adapter) return { ok: false, reason: "no WebGPU adapter" };
-        return { ok: true };
-      } catch (err) {
-        return { ok: false, reason: String(err && err.message ? err.message : err) };
+    function killWorker() {
+      clearTimeout(stopTimer);
+      stopTimer = null;
+      if (worker) {
+        try { worker.terminate(); } catch (_) {}
+        worker = null;
       }
+      ready = false;
+      loadedModelId = null;
+      generating = false;
+      stopping = false;
     }
 
-    /* ============================================================
-       Model load
-       ============================================================ */
-    async function ensureWebLLM() {
-      if (webllm) return webllm;
-      setStatus("Importing WebLLM…");
-      webllm = await import(WEBLLM_URL);
-      return webllm;
-    }
-
-    async function loadModel(modelId) {
-      const gpu = await checkWebGPU();
-      if (!gpu.ok) {
-        els.nowebgpu.classList.add("visible");
-        setStatus("WebGPU unavailable — cannot load model.", "error");
-        throw new Error(gpu.reason);
-      }
-      els.nowebgpu.classList.remove("visible");
-
-      await ensureWebLLM();
-
+    function bootWorker(modelId) {
+      killWorker();
       els.progressWrap.classList.add("visible");
       els.progressBar.style.width = "0%";
       els.progressText.textContent = "Starting download…";
-      els.loadBtn.disabled = true;
-      els.generateBtn.disabled = true;
-      els.regenerateBtn.disabled = true;
       setStatus("Loading model…");
+      updateActionButtons();
 
-      // Surface device-lost mid-load if the browser fires it
-      let lostMsg = null;
-      const onLost = (ev) => {
-        lostMsg = (ev && ev.reason) || "WebGPU device lost";
-      };
-      try {
-        // Best-effort: some browsers expose gpu.onuncapturederror later on the device
-      } catch (_) {}
-
-      const initProgressCallback = (report) => {
-        const pct = Math.max(0, Math.min(100, Math.round((report.progress || 0) * 100)));
-        els.progressBar.style.width = pct + "%";
-        els.progressText.textContent = report.text || (pct + "%");
-        setStatus("Loading model… " + pct + "%");
-      };
-
-      try {
-        if (engine) {
-          try { await engine.unload(); } catch (_) {}
-          engine = null;
-          loadedModelId = null;
-        }
-
-        engine = await webllm.CreateMLCEngine(modelId, { initProgressCallback });
-        loadedModelId = modelId;
-        savePref("tf2pg_model", modelId);
-
-        // Attach device-lost handler on the engine's GPU device if exposed
-        try {
-          if (engine && engine.gpuDevice && typeof engine.gpuDevice.addEventListener === "function") {
-            engine.gpuDevice.addEventListener("uncapturederror", (e) => {
-              console.warn("WebGPU uncaptured error", e);
-            });
-          }
-        } catch (_) {}
-
-        els.progressBar.style.width = "100%";
-        els.progressText.textContent = "Model ready (cached for next visit).";
-        setStatus("Ready.", "ok");
-        els.generateBtn.disabled = false;
-        els.regenerateBtn.disabled = !lastUserPrompt;
-      } catch (err) {
-        console.error(err);
-        const friendly = friendlyGpuError(err);
-        setStatus("Failed to load model: " + friendly, "error");
-        // If they tried a larger model, nudge the dropdown toward the small one
-        if (/GPU memory|smaller Qwen/i.test(friendly)) {
-          els.modelSelect.value = SMALL_MODEL;
-          updateModelHint();
-        }
-        throw err;
-      } finally {
-        els.loadBtn.disabled = false;
-        void lostMsg;
+      if (typeof WebAssembly === "undefined") {
+        setStatus("This browser does not support WebAssembly. Try a recent Chrome, Firefox, Safari, or Edge.", "error");
+        return;
       }
+
+      try {
+        worker = new Worker("worker.js", { type: "module" });
+      } catch (err) {
+        setStatus("Web Workers are unavailable. Open this page over HTTPS (or localhost) in a modern browser.", "error");
+        return;
+      }
+
+      worker.onerror = () => {
+        killWorker();
+        setStatus("The model worker could not start. Check your connection and reload. A modern browser with WebAssembly is needed.", "error");
+        updateActionButtons();
+      };
+
+      worker.onmessage = ({ data }) => {
+        if (data.type === "progress") {
+          const pct = Math.max(0, Math.min(100, data.percent || 0));
+          els.progressBar.style.width = pct + "%";
+          els.progressText.textContent = data.label || (Math.floor(pct) + "%");
+          setStatus("Loading model… " + Math.floor(pct) + "%");
+        }
+        if (data.type === "ready") {
+          ready = true;
+          loadedModelId = data.modelId || modelId;
+          savePref("tf2pg_model", loadedModelId);
+          els.progressBar.style.width = "100%";
+          els.progressText.textContent = "Model ready (cached for next visit when storage allows).";
+          setStatus("Ready.", "ok");
+          updateActionButtons();
+        }
+        if (data.type === "context") {
+          setStatus(`Generating… using ${data.used} of ${data.total} prompt tokens`);
+        }
+        if (data.type === "chunk" && generating) {
+          streamBuffer += data.text;
+          els.output.value = streamBuffer;
+          els.output.scrollTop = els.output.scrollHeight;
+          updateActionButtons();
+        }
+        if (data.type === "done") {
+          clearTimeout(stopTimer);
+          stopTimer = null;
+          generating = false;
+          stopping = false;
+          setStatus(data.stopped ? "Stopped." : "Ready.", "ok");
+          updateActionButtons();
+        }
+        if (data.type === "error") {
+          clearTimeout(stopTimer);
+          stopTimer = null;
+          generating = false;
+          stopping = false;
+          ready = !!data.loaded;
+          setStatus(data.message, "error");
+          updateActionButtons();
+        }
+      };
+
+      worker.postMessage({ type: "load", modelId });
+    }
+
+    function loadSelectedModel() {
+      const id = els.modelSelect.value;
+      if (!isKnownModel(id)) {
+        setStatus("Unknown model id.", "error");
+        return;
+      }
+      // Always terminate/recreate so we never keep two models in memory.
+      bootWorker(id);
     }
 
     /* ============================================================
        Generation
        ============================================================ */
-    async function generate(isRegen) {
-      if (!engine || generating) return;
+    function generate(isRegen) {
+      if (!ready || !worker || generating) return;
 
-      const userPrompt = isRegen && lastUserPrompt ? lastUserPrompt : buildUserPrompt();
-      lastUserPrompt = userPrompt;
+      const prompt = isRegen && lastPrompt ? lastPrompt : buildCompletionPrompt();
+      lastPrompt = prompt;
 
-      const messages = [{ role: "system", content: SYSTEM_PROMPT }];
-      for (const ex of FEW_SHOTS) {
-        messages.push({ role: "user", content: ex.user });
-        messages.push({ role: "assistant", content: ex.assistant });
-      }
-      messages.push({ role: "user", content: userPrompt });
+      const temperature = Number(els.chaosSlider.value);
+      const max_new_tokens = LENGTH_TOKENS[els.lengthSelect.value] || 220;
 
-      const temp = chaosToTemp(els.chaosSlider.value);
-      const maxTokens = LENGTH_TOKENS[els.lengthSelect.value] || 550;
-
+      streamBuffer = visibleSeedFromPrompt(prompt);
+      els.output.value = streamBuffer;
       generating = true;
-      els.generateBtn.disabled = true;
-      els.regenerateBtn.disabled = true;
-      els.stopBtn.disabled = false;
-      els.copyBtn.disabled = true;
-      els.clearBtn.disabled = true;
-      els.output.value = "";
+      stopping = false;
       setStatus("Generating…");
+      updateActionButtons();
 
-      try {
-        const stream = await engine.chat.completions.create({
-          messages,
-          stream: true,
-          temperature: temp,
-          max_tokens: maxTokens,
-          frequency_penalty: 0.4,
-          presence_penalty: 0.3,
-          repetition_penalty: 1.05,
-        });
-
-        let full = "";
-        for await (const chunk of stream) {
-          const delta = chunk.choices?.[0]?.delta?.content || "";
-          if (delta) {
-            full += delta;
-            els.output.value = full;
-            els.output.scrollTop = els.output.scrollHeight;
-          }
-        }
-        setStatus("Ready.", "ok");
-      } catch (err) {
-        const msg = String(err && err.message ? err.message : err);
-        if (/interrup/i.test(msg) || /abort/i.test(msg) || /cancel/i.test(msg)) {
-          setStatus("Stopped.", "ok");
-        } else {
-          console.error(err);
-          setStatus("Generation failed: " + friendlyGpuError(err), "error");
-        }
-      } finally {
-        generating = false;
-        els.stopBtn.disabled = true;
-        els.generateBtn.disabled = !engine;
-        els.regenerateBtn.disabled = !engine || !lastUserPrompt;
-        els.copyBtn.disabled = !els.output.value;
-        els.clearBtn.disabled = !els.output.value;
-      }
+      worker.postMessage({
+        type: "generate",
+        text: prompt,
+        settings: {
+          max_new_tokens,
+          temperature,
+          top_k: 40,
+          top_p: 0.95,
+          repetition_penalty: 1.1,
+          context: CONTEXT_TOKENS,
+        },
+      });
     }
 
-    async function stopGenerate() {
-      if (!engine || !generating) return;
-      try {
-        await engine.interruptGenerate();
-      } catch (err) {
-        console.warn("interruptGenerate failed", err);
-      }
+    function stopGenerate() {
+      if (!worker || !generating || stopping) return;
+      stopping = true;
+      setStatus("Stopping…");
+      updateActionButtons();
+      worker.postMessage({ type: "stop" });
+      // Hard kill if WASM does not yield promptly, then reload the same model.
+      const modelId = loadedModelId || els.modelSelect.value;
+      stopTimer = setTimeout(() => {
+        killWorker();
+        setStatus("Stopped. Reloading model…");
+        bootWorker(modelId);
+      }, 1800);
     }
 
     /* ============================================================
-       Wire up UI
+       Action bar height sync (keep layout fix)
+       ============================================================ */
+    function syncActionBarHeight() {
+      const bar = document.getElementById("actionBar");
+      if (!bar) return;
+      const h = Math.ceil(bar.getBoundingClientRect().height);
+      if (h > 0) document.documentElement.style.setProperty("--action-h", h + "px");
+    }
+
+    /* ============================================================
+       Boot UI
        ============================================================ */
     function initUI() {
       const mobile = isMobileLike();
       if (mobile) els.mobileNote.classList.add("visible");
 
-      // Prefer saved choice; otherwise smallest on mobile, DEFAULT on desktop
       const fallback = mobile ? SMALL_MODEL : DEFAULT_MODEL;
-      const preferred = loadPref("tf2pg_model", fallback);
+      let preferred = loadPref("tf2pg_model", fallback);
+      // Ignore leftover WebLLM ids from earlier versions of this page.
+      if (!isKnownModel(preferred)) preferred = fallback;
 
       for (const opt of MODEL_OPTIONS) {
         const o = document.createElement("option");
@@ -870,15 +799,11 @@ Updated localization
 
       els.updateDate.value = todayISO();
       els.chaosLabel.textContent = Number(els.chaosSlider.value).toFixed(2);
-
       els.chaosSlider.addEventListener("input", () => {
         els.chaosLabel.textContent = Number(els.chaosSlider.value).toFixed(2);
       });
 
-      els.loadBtn.addEventListener("click", async () => {
-        try { await loadModel(els.modelSelect.value); } catch (_) {}
-      });
-
+      els.loadBtn.addEventListener("click", () => loadSelectedModel());
       els.generateBtn.addEventListener("click", () => generate(false));
       els.regenerateBtn.addEventListener("click", () => generate(true));
       els.stopBtn.addEventListener("click", () => stopGenerate());
@@ -896,27 +821,20 @@ Updated localization
 
       els.clearBtn.addEventListener("click", () => {
         els.output.value = "";
-        els.copyBtn.disabled = true;
-        els.clearBtn.disabled = true;
-        setStatus("Cleared.", "ok");
+        streamBuffer = "";
+        setStatus(ready ? "Cleared." : "Ready to load a model.", ready ? "ok" : undefined);
+        updateActionButtons();
       });
 
       els.output.addEventListener("input", () => {
-        const has = !!els.output.value;
-        els.copyBtn.disabled = !has;
-        els.clearBtn.disabled = !has;
+        streamBuffer = els.output.value;
+        updateActionButtons();
       });
+
+      updateActionButtons();
     }
 
-    /* Keep spacer in sync with the real fixed-bar height (wrap, safe-area, font scaling). */
-    function syncActionBarHeight() {
-      const bar = document.getElementById("actionBar");
-      if (!bar) return;
-      const h = Math.ceil(bar.getBoundingClientRect().height);
-      if (h > 0) {
-        document.documentElement.style.setProperty("--action-h", h + "px");
-      }
-    }
+    initUI();
     syncActionBarHeight();
     window.addEventListener("resize", syncActionBarHeight);
     try {
@@ -924,17 +842,6 @@ Updated localization
         new ResizeObserver(syncActionBarHeight).observe(document.getElementById("actionBar"));
       }
     } catch (_) {}
-
-    initUI();
-    checkWebGPU().then((gpu) => {
-      if (!gpu.ok) {
-        els.nowebgpu.classList.add("visible");
-        setStatus("WebGPU unavailable. Load is disabled until you switch browsers.", "error");
-        els.loadBtn.disabled = true;
-      } else {
-        setStatus("Ready to load a model.");
-      }
-    });
   </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # TF2 Patch Notes Generator
 
-A single-page, fully client-side app that writes **fictional** Team Fortress 2-style patch notes. A small instruction-tuned LLM runs in your browser on **WebGPU** via [WebLLM](https://github.com/mlc-ai/web-llm). There is no backend.
+A single-page, fully client-side app that writes **fictional** Team Fortress 2-style patch notes. A Xenova **GPT-2** model (transformers.js, WASM) continues a few-shot prompt in your browser. There is no backend.
 
 **Live:** https://hellold.dev/tf2-patchgen/
 
@@ -10,63 +10,54 @@ All notes are made up. This project is not affiliated with Valve Corporation.
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Entire app (inline CSS + JS). Loads WebLLM from jsDelivr. |
+| `index.html` | UI (inline CSS + JS). Spawns `worker.js`. |
+| `worker.js` | Module worker: downloads + runs the model off the UI thread. |
 | `.nojekyll` | Tells GitHub Pages not to run Jekyll. |
 | `README.md` | This file. |
 
-## Mobile
-
-The layout is mobile-first: single column, ≥44px tap targets, 16px inputs (no iOS zoom),
-safe-area padding, and a sticky Generate / Stop bar. On phones (coarse pointer, narrow
-viewport, or low `deviceMemory`) the model dropdown defaults to **Qwen2.5 0.5B**.
-Out-of-memory / device-lost errors suggest switching to that smaller model.
-
 ## Requirements
 
-- A browser with **WebGPU**:
-  - Chrome or Edge 113+ (desktop)
-  - Recent Chrome on Android
-  - Safari 26+ with WebGPU
-  - Firefox with `dom.webgpu.enabled` in `about:config`
-- First visit downloads the model (hundreds of MB). After that the browser cache keeps it.
+- A modern browser with **WebAssembly** and module workers (Chrome, Firefox, Safari, Edge).
+- First visit downloads the model (tens to a few hundred MB). After that the browser cache keeps it when storage is available.
+- No WebGPU required.
 
 ## Models
 
-Pinned WebLLM version: **`@mlc-ai/web-llm@0.2.87`**.
+Pinned runtime: **`@huggingface/transformers@3.8.1`** (jsDelivr).
 
-Default and dropdown options (must exist in that version's `prebuiltAppConfig.model_list`):
+Every option loads the q8 WASM build with `model_file_name: 'decoder_model_merged'` (required for Xenova GPT-2).
 
-| Role | Model id |
-|------|----------|
-| Smaller | `Qwen2.5-0.5B-Instruct-q4f16_1-MLC` |
-| Default | `Qwen2.5-1.5B-Instruct-q4f16_1-MLC` |
-| Larger | `Llama-3.2-3B-Instruct-q4f16_1-MLC` |
+| Role | Model id | Approx first download |
+|------|----------|------------------------|
+| Smaller / mobile default | `Xenova/distilgpt2` | ~85 MB |
+| Desktop default (`DEFAULT_MODEL`) | `Xenova/gpt2` | ~130 MB |
+| Larger | `Xenova/gpt2-medium` | ~350 MB |
+
+Phones (coarse pointer, narrow viewport, or low `deviceMemory`) default to DistilGPT-2.
 
 ### How to swap models
 
-1. Open `index.html`.
-2. Change `DEFAULT_MODEL` near the top of the `<script type="module">` block.
-3. Edit the `MODEL_OPTIONS` array (labels + ids).
-4. Confirm the ids exist in WebLLM's prebuilt list for the pinned version (see `prebuiltAppConfig.model_list` in the package).
-5. Optionally bump `WEBLLM_URL` to a newer pinned jsDelivr version, then re-check the model list.
+1. Open `index.html` and edit `DEFAULT_MODEL`, `SMALL_MODEL`, and the `MODEL_OPTIONS` array.
+2. Mirror any new size hints in `SIZE_HINTS` inside `worker.js`.
+3. Keep `model_file_name: 'decoder_model_merged'` for Xenova GPT-2 family checkpoints.
+4. Optionally bump the transformers URL pin in `worker.js` (`TRANSFORMERS_URL`).
+
+## Mobile layout
+
+Single column, ≥44px tap targets, 16px inputs (no iOS zoom), safe-area padding, and a fixed bottom Generate / Stop bar with a matching spacer so Focus / Copy / Clear / Regenerate / the footer can scroll fully into view.
 
 ## Local preview
 
-Any static server works, for example:
-
 ```bash
 npx --yes serve -l 4173 .
-# then open http://127.0.0.1:4173/
+# open http://127.0.0.1:4173/
 ```
-
-WebGPU is required for generation. Headless Chromium often needs flags such as `--enable-unsafe-webgpu` or a SwiftShader adapter.
 
 ## Deploy (GitHub Pages)
 
 ```bash
-gh repo create hellold6/tf2-patchgen --public --source=. --remote=origin --push
-gh api -X POST repos/hellold6/tf2-patchgen/pages \
-  -f "source[branch]=main" -f "source[path]=/"
+git push origin main
+# Pages already serves from main /
 ```
 
-Project Pages for this account are served under the user custom domain, e.g. `https://hellold.dev/tf2-patchgen/`.
+Project Pages for this account are under the user custom domain, e.g. `https://hellold.dev/tf2-patchgen/`.
