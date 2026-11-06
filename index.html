@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Generate fictional Team Fortress 2-style patch notes in your browser." />
+  <title>TF2 Patch Notes Generator</title>
+  <style>
+    /* ---- theme: follows prefers-color-scheme ---- */
+    :root {
+      --bg: #f4f1ea;
+      --fg: #1a1a1a;
+      --muted: #5c5c5c;
+      --card: #ffffff;
+      --border: #cfc8b8;
+      --accent: #c4541a;
+      --accent-fg: #fff;
+      --danger: #a11;
+      --ok: #1a6b2c;
+      --input: #faf8f3;
+      --shadow: 0 1px 3px rgba(0,0,0,.08);
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+      --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161412;
+        --fg: #ece6da;
+        --muted: #a59b8a;
+        --card: #221f1a;
+        --border: #3a342b;
+        --accent: #e07030;
+        --accent-fg: #1a120c;
+        --danger: #ff6b6b;
+        --ok: #6dca84;
+        --input: #1b1814;
+        --shadow: 0 1px 3px rgba(0,0,0,.4);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.45;
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 3rem;
+    }
+    header h1 {
+      font-size: 1.55rem;
+      margin: 0 0 .25rem;
+      letter-spacing: -.01em;
+    }
+    header p {
+      margin: 0 0 1.25rem;
+      color: var(--muted);
+      font-size: .95rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow);
+    }
+    .card h2 {
+      font-size: .85rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin: 0 0 .75rem;
+      font-weight: 600;
+    }
+
+    label {
+      display: block;
+      font-size: .85rem;
+      margin-bottom: .3rem;
+      color: var(--muted);
+    }
+    .field { margin-bottom: .85rem; }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+    @media (max-width: 560px) {
+      .row { grid-template-columns: 1fr; }
+    }
+
+    input[type="text"],
+    input[type="date"],
+    select,
+    textarea {
+      width: 100%;
+      font: inherit;
+      color: var(--fg);
+      background: var(--input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .55rem .65rem;
+    }
+    textarea {
+      font-family: var(--mono);
+      font-size: .88rem;
+      min-height: 280px;
+      resize: vertical;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .hint {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: .2rem;
+    }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .9rem;
+      color: var(--fg);
+      margin: .5rem 0 0;
+    }
+    .check input { width: auto; accent-color: var(--accent); }
+
+    .btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      margin-top: .25rem;
+    }
+    button {
+      font: inherit;
+      font-size: .9rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--input);
+      color: var(--fg);
+      padding: .55rem .9rem;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { filter: brightness(1.05); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button.primary {
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: transparent;
+      font-weight: 600;
+    }
+    button.danger {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    #status {
+      font-size: .9rem;
+      color: var(--muted);
+      margin: .5rem 0 0;
+      min-height: 1.3em;
+    }
+    #status.error { color: var(--danger); }
+    #status.ok { color: var(--ok); }
+
+    .progress-wrap {
+      display: none;
+      margin-top: .65rem;
+    }
+    .progress-wrap.visible { display: block; }
+    .progress-bar {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width .2s ease;
+    }
+    .progress-text {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: .3rem;
+    }
+
+    #nowebgpu {
+      display: none;
+      border: 1px solid var(--danger);
+      background: color-mix(in srgb, var(--danger) 12%, var(--card));
+      color: var(--fg);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    #nowebgpu.visible { display: block; }
+    #nowebgpu strong { color: var(--danger); }
+
+    footer {
+      margin-top: 1.5rem;
+      font-size: .78rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>TF2 Patch Notes Generator</h1>
+      <p>Fake but believable Team Fortress 2 update notes, written by a small LLM that runs entirely in your browser.</p>
+    </header>
+
+    <div id="nowebgpu" role="alert">
+      <strong>WebGPU is not available in this browser.</strong>
+      <p style="margin:.5rem 0 0">This app needs WebGPU to run the model locally. Try:</p>
+      <ul style="margin:.4rem 0 0; padding-left: 1.2rem">
+        <li>Chrome or Edge 113+ on desktop</li>
+        <li>Recent Chrome on Android</li>
+        <li>Safari 26+ (WebGPU enabled)</li>
+        <li>Firefox with <code>dom.webgpu.enabled</code> turned on in about:config</li>
+      </ul>
+    </div>
+
+    <section class="card">
+      <h2>Model</h2>
+      <div class="field">
+        <label for="modelSelect">Model</label>
+        <select id="modelSelect"></select>
+        <div class="hint">First load downloads the model (hundreds of MB). After that it is cached by the browser.</div>
+      </div>
+      <div class="btns">
+        <button type="button" id="loadBtn" class="primary">Load model</button>
+      </div>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar"><span id="progressBar"></span></div>
+        <div class="progress-text" id="progressText">Starting download…</div>
+      </div>
+      <p id="status">Ready to load a model.</p>
+    </section>
+
+    <section class="card">
+      <h2>Update settings</h2>
+      <div class="row">
+        <div class="field">
+          <label for="updateDate">Update date</label>
+          <input type="date" id="updateDate" />
+        </div>
+        <div class="field">
+          <label for="lengthSelect">Length</label>
+          <select id="lengthSelect">
+            <option value="short">Short hotfix</option>
+            <option value="normal" selected>Normal update</option>
+            <option value="huge">Huge update</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="focusInput">Focus (optional)</label>
+        <input type="text" id="focusInput" placeholder="e.g. Scout, Stickybomb Launcher, Dustbowl" />
+        <div class="hint">Comma-separated classes, weapons, or maps to lean on.</div>
+      </div>
+      <div class="field">
+        <label for="chaosSlider">Chaos <span id="chaosLabel">0.70</span></label>
+        <input type="range" id="chaosSlider" min="0.3" max="1.2" step="0.05" value="0.7" />
+        <div class="hint">0.3 = serious Valve tone · 1.2 = unhinged</div>
+      </div>
+      <label class="check">
+        <input type="checkbox" id="jokeCheck" checked />
+        Include a joke entry or two
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Patch notes</h2>
+      <div class="btns" style="margin-bottom:.75rem">
+        <button type="button" id="generateBtn" class="primary" disabled>Generate</button>
+        <button type="button" id="regenerateBtn" disabled>Regenerate</button>
+        <button type="button" id="stopBtn" class="danger" disabled>Stop</button>
+        <button type="button" id="copyBtn" disabled>Copy</button>
+        <button type="button" id="clearBtn" disabled>Clear</button>
+      </div>
+      <textarea id="output" spellcheck="false" placeholder="Generated notes will appear here. You can edit them freely."></textarea>
+    </section>
+
+    <footer>
+      All notes are fictional and generated for fun.<br />
+      This project is not affiliated with Valve Corporation or Team Fortress 2.
+    </footer>
+  </div>
+
+  <script type="module">
+    /* ============================================================
+       CONFIG — change these to swap models or rename the app
+       ============================================================ */
+
+    // Default model id (must exist in WebLLM prebuiltAppConfig.model_list)
+    const DEFAULT_MODEL = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+
+    // Dropdown options: smaller + default + larger
+    const MODEL_OPTIONS = [
+      { id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", label: "Qwen2.5 0.5B (smaller, faster)" },
+      { id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC", label: "Qwen2.5 1.5B (default)" },
+      { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", label: "Llama 3.2 3B (larger, slower)" },
+    ];
+
+    // Pinned WebLLM version (jsDelivr ESM)
+    const WEBLLM_URL = "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.87/+esm";
+
+    // Length → max_tokens
+    const LENGTH_TOKENS = { short: 280, normal: 550, huge: 900 };
+
+    /* ============================================================
+       PROMPTS — original few-shots (do not copy real Valve notes)
+       ============================================================ */
+
+    const SYSTEM_PROMPT = `You are a writer for fictional Team Fortress 2 patch notes.
+Write in Valve's classic TF2 update style: dry, past-tense, short bullet lines.
+Start every response with exactly:
+Team Fortress 2 Update Released
+then a date line, then section headers followed by bullets that begin with Fixed, Added, Updated, Changed, Improved, or Removed.
+Use only these section names when needed: Gameplay updates, Weapons, Bug fixes, Maps, Updated localization.
+Never claim this is an official Valve update. Never wrap the notes in markdown code fences.
+Output ONLY the patch notes text — no preamble, no closing commentary.`;
+
+    // Original examples written for this project (not copied from real notes)
+    const FEW_SHOTS = [
+      {
+        user: "Write a normal TF2 update for 2024-03-12. Focus: Soldier, Rocket Launcher. Include a joke entry or two. Tone: serious.",
+        assistant: `Team Fortress 2 Update Released
+March 12, 2024
+
+Gameplay updates
+- Changed Soldier rocket jump height so mid-air corrections feel a little snappier
+- Fixed a case where players could briefly stand on inactive payload carts
+
+Weapons
+- Updated the Rocket Launcher: rockets now leave a shorter smoke trail for clearer sightlines
+- Fixed the Black Box not granting health when damaging disguised Spies
+- Added a rare misfire quip when the Soldier reloads with an empty clip and nothing happens
+
+Bug fixes
+- Fixed the scoreboard flashing blank for one frame after round restart
+- Fixed spectators hearing the wrong team's voice lines in tournament mode
+
+Maps
+- Updated Dustbowl: plugged a tiny gap behind RED's second-stage battlements
+
+Updated localization
+- Added community translations for the new rocket misfire quip`,
+      },
+      {
+        user: "Write a short hotfix TF2 update for 2025-07-01. Focus: Engineer, Wrangler. Tone: serious.",
+        assistant: `Team Fortress 2 Update Released
+July 1, 2025
+
+Bug fixes
+- Fixed the Wrangler laser lingering on screen after the Engineer died
+- Fixed Sentry Guns ignoring the Wrangler shield cooldown in rare lag spikes
+- Fixed a crash when picking up a Toolbox while holding the Wrangler
+
+Updated localization
+- Corrected a typo in the Wrangler kill feed string`,
+      },
+      {
+        user: "Write a huge TF2 update for 2023-11-28. Focus: Spy, Knife, Turbine. Include a joke entry or two. Tone: a bit unhinged.",
+        assistant: `Team Fortress 2 Update Released
+November 28, 2023
+
+Gameplay updates
+- Changed cloak flicker timing so Spies are a hair easier to spot while bumping teammates
+- Added a brief footstep muffling window right after a successful backstab
+- Fixed players getting stuck in the resupply cabinet animation when spam-pressing E
+
+Weapons
+- Updated the Knife: backstabs against airborne targets now play a slightly longer flourish
+- Changed the Ambassador: first accurate shot after zooming lands a touch sooner
+- Fixed the Dead Ringer not playing its warning beep after a fake death in water
+- Added a very rare line where the Spy apologizes to the corpse. He does not mean it.
+
+Bug fixes
+- Fixed the loadout screen preview spinning forever if you clicked cosmetics too fast
+- Fixed a case where stickybombs could attach to the Spy's cigarette and travel with him
+- Fixed tournament casters seeing the wrong disguise class icon
+
+Maps
+- Updated Turbine: added a small crate stack near mid so Scouts stop asking for cover that was never there
+- Fixed a pixel walk on Turbine's battlements that let Snipers see into RED spawn
+
+Updated localization
+- Added translations for the Spy's rare apology line
+- Fixed an Italian string that accidentally called the Knife a spoon`,
+      },
+    ];
+
+    /* ============================================================
+       DOM refs
+       ============================================================ */
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      modelSelect: $("modelSelect"),
+      loadBtn: $("loadBtn"),
+      progressWrap: $("progressWrap"),
+      progressBar: $("progressBar"),
+      progressText: $("progressText"),
+      status: $("status"),
+      nowebgpu: $("nowebgpu"),
+      updateDate: $("updateDate"),
+      lengthSelect: $("lengthSelect"),
+      focusInput: $("focusInput"),
+      chaosSlider: $("chaosSlider"),
+      chaosLabel: $("chaosLabel"),
+      jokeCheck: $("jokeCheck"),
+      generateBtn: $("generateBtn"),
+      regenerateBtn: $("regenerateBtn"),
+      stopBtn: $("stopBtn"),
+      copyBtn: $("copyBtn"),
+      clearBtn: $("clearBtn"),
+      output: $("output"),
+    };
+
+    /* ============================================================
+       State
+       ============================================================ */
+    let webllm = null;       // module namespace after import
+    let engine = null;       // MLCEngine instance
+    let loadedModelId = null;
+    let generating = false;
+    let lastUserPrompt = null; // for Regenerate
+
+    /* ============================================================
+       Helpers
+       ============================================================ */
+    function setStatus(text, kind) {
+      els.status.textContent = text;
+      els.status.classList.remove("error", "ok");
+      if (kind) els.status.classList.add(kind);
+    }
+
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function formatDateLabel(iso) {
+      // "2026-11-06" → "November 6, 2026"
+      try {
+        const [y, m, d] = iso.split("-").map(Number);
+        const dt = new Date(y, m - 1, d);
+        return dt.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      } catch {
+        return iso;
+      }
+    }
+
+    function chaosToTemp(v) {
+      // slider already IS temperature 0.3–1.2
+      return Number(v);
+    }
+
+    function toneWord(temp) {
+      if (temp <= 0.45) return "serious and dry";
+      if (temp <= 0.85) return "classic Valve dry humor";
+      return "a bit unhinged, still past-tense patch-note style";
+    }
+
+    function buildUserPrompt() {
+      const iso = els.updateDate.value || todayISO();
+      const length = els.lengthSelect.value;
+      const focus = els.focusInput.value.trim();
+      const jokes = els.jokeCheck.checked;
+      const temp = chaosToTemp(els.chaosSlider.value);
+
+      const lengthLabel =
+        length === "short" ? "short hotfix" :
+        length === "huge" ? "huge update" : "normal update";
+
+      let prompt = `Write a ${lengthLabel} TF2 update for ${formatDateLabel(iso)}.`;
+      if (focus) prompt += ` Focus: ${focus}.`;
+      prompt += jokes
+        ? " Include a joke entry or two."
+        : " Do not include joke entries.";
+      prompt += ` Tone: ${toneWord(temp)}.`;
+      return prompt;
+    }
+
+    function savePref(key, value) {
+      try { localStorage.setItem(key, value); } catch (_) { /* ignore */ }
+    }
+    function loadPref(key, fallback) {
+      try {
+        const v = localStorage.getItem(key);
+        return v == null ? fallback : v;
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    /* ============================================================
+       WebGPU check
+       ============================================================ */
+    async function checkWebGPU() {
+      if (!navigator.gpu) return { ok: false, reason: "navigator.gpu is missing" };
+      try {
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) return { ok: false, reason: "no WebGPU adapter" };
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, reason: String(err && err.message ? err.message : err) };
+      }
+    }
+
+    /* ============================================================
+       Model load
+       ============================================================ */
+    async function ensureWebLLM() {
+      if (webllm) return webllm;
+      setStatus("Importing WebLLM…");
+      webllm = await import(WEBLLM_URL);
+      return webllm;
+    }
+
+    async function loadModel(modelId) {
+      const gpu = await checkWebGPU();
+      if (!gpu.ok) {
+        els.nowebgpu.classList.add("visible");
+        setStatus("WebGPU unavailable — cannot load model.", "error");
+        throw new Error(gpu.reason);
+      }
+      els.nowebgpu.classList.remove("visible");
+
+      await ensureWebLLM();
+
+      els.progressWrap.classList.add("visible");
+      els.progressBar.style.width = "0%";
+      els.progressText.textContent = "Starting download…";
+      els.loadBtn.disabled = true;
+      els.generateBtn.disabled = true;
+      els.regenerateBtn.disabled = true;
+      setStatus("Loading model…");
+
+      const initProgressCallback = (report) => {
+        // report.progress is 0..1
+        const pct = Math.max(0, Math.min(100, Math.round((report.progress || 0) * 100)));
+        els.progressBar.style.width = pct + "%";
+        els.progressText.textContent = report.text || (pct + "%");
+        setStatus("Loading model… " + pct + "%");
+      };
+
+      try {
+        // Recreate engine when switching models so VRAM is released cleanly
+        if (engine) {
+          try { await engine.unload(); } catch (_) { /* ignore */ }
+          engine = null;
+          loadedModelId = null;
+        }
+
+        engine = await webllm.CreateMLCEngine(modelId, { initProgressCallback });
+        loadedModelId = modelId;
+        savePref("tf2pg_model", modelId);
+
+        els.progressBar.style.width = "100%";
+        els.progressText.textContent = "Model ready (cached for next visit).";
+        setStatus("Ready.", "ok");
+        els.generateBtn.disabled = false;
+        els.regenerateBtn.disabled = !lastUserPrompt;
+      } catch (err) {
+        console.error(err);
+        setStatus("Failed to load model: " + (err && err.message ? err.message : err), "error");
+        throw err;
+      } finally {
+        els.loadBtn.disabled = false;
+      }
+    }
+
+    /* ============================================================
+       Generation
+       ============================================================ */
+    async function generate(isRegen) {
+      if (!engine || generating) return;
+
+      const userPrompt = isRegen && lastUserPrompt ? lastUserPrompt : buildUserPrompt();
+      lastUserPrompt = userPrompt;
+
+      const messages = [
+        { role: "system", content: SYSTEM_PROMPT },
+      ];
+      // few-shot pairs
+      for (const ex of FEW_SHOTS) {
+        messages.push({ role: "user", content: ex.user });
+        messages.push({ role: "assistant", content: ex.assistant });
+      }
+      messages.push({ role: "user", content: userPrompt });
+
+      const temp = chaosToTemp(els.chaosSlider.value);
+      const maxTokens = LENGTH_TOKENS[els.lengthSelect.value] || 550;
+
+      generating = true;
+      els.generateBtn.disabled = true;
+      els.regenerateBtn.disabled = true;
+      els.stopBtn.disabled = false;
+      els.copyBtn.disabled = true;
+      els.clearBtn.disabled = true;
+      els.output.value = "";
+      setStatus("Generating…");
+
+      try {
+        const stream = await engine.chat.completions.create({
+          messages,
+          stream: true,
+          temperature: temp,
+          max_tokens: maxTokens,
+          // Penalties to reduce copy-paste loops in long notes
+          frequency_penalty: 0.4,
+          presence_penalty: 0.3,
+          // Also set repetition_penalty when supported by the runtime
+          repetition_penalty: 1.05,
+        });
+
+        let full = "";
+        for await (const chunk of stream) {
+          const delta = chunk.choices?.[0]?.delta?.content || "";
+          if (delta) {
+            full += delta;
+            els.output.value = full;
+            // keep scrolled to bottom while streaming
+            els.output.scrollTop = els.output.scrollHeight;
+          }
+        }
+        setStatus("Ready.", "ok");
+      } catch (err) {
+        // interruptGenerate() typically rejects the stream — treat as a soft stop
+        const msg = String(err && err.message ? err.message : err);
+        if (/interrup/i.test(msg) || /abort/i.test(msg) || /cancel/i.test(msg)) {
+          setStatus("Stopped.", "ok");
+        } else {
+          console.error(err);
+          setStatus("Generation failed: " + msg, "error");
+        }
+      } finally {
+        generating = false;
+        els.stopBtn.disabled = true;
+        els.generateBtn.disabled = !engine;
+        els.regenerateBtn.disabled = !engine || !lastUserPrompt;
+        els.copyBtn.disabled = !els.output.value;
+        els.clearBtn.disabled = !els.output.value;
+      }
+    }
+
+    async function stopGenerate() {
+      if (!engine || !generating) return;
+      try {
+        await engine.interruptGenerate();
+      } catch (err) {
+        console.warn("interruptGenerate failed", err);
+      }
+    }
+
+    /* ============================================================
+       Wire up UI
+       ============================================================ */
+    function initUI() {
+      // Fill model dropdown
+      const preferred = loadPref("tf2pg_model", DEFAULT_MODEL);
+      for (const opt of MODEL_OPTIONS) {
+        const o = document.createElement("option");
+        o.value = opt.id;
+        o.textContent = opt.label;
+        if (opt.id === preferred) o.selected = true;
+        els.modelSelect.appendChild(o);
+      }
+      // If preferred wasn't in the list, select DEFAULT
+      if (![...els.modelSelect.options].some((o) => o.selected)) {
+        els.modelSelect.value = DEFAULT_MODEL;
+      }
+
+      els.updateDate.value = todayISO();
+      els.chaosLabel.textContent = Number(els.chaosSlider.value).toFixed(2);
+
+      els.chaosSlider.addEventListener("input", () => {
+        els.chaosLabel.textContent = Number(els.chaosSlider.value).toFixed(2);
+      });
+
+      els.loadBtn.addEventListener("click", async () => {
+        try {
+          await loadModel(els.modelSelect.value);
+        } catch (_) { /* status already set */ }
+      });
+
+      els.generateBtn.addEventListener("click", () => generate(false));
+      els.regenerateBtn.addEventListener("click", () => generate(true));
+      els.stopBtn.addEventListener("click", () => stopGenerate());
+
+      els.copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(els.output.value);
+          setStatus("Copied to clipboard.", "ok");
+        } catch {
+          // fallback
+          els.output.select();
+          try { document.execCommand("copy"); setStatus("Copied.", "ok"); }
+          catch { setStatus("Copy failed — select the text manually.", "error"); }
+        }
+      });
+
+      els.clearBtn.addEventListener("click", () => {
+        els.output.value = "";
+        els.copyBtn.disabled = true;
+        els.clearBtn.disabled = true;
+        setStatus("Cleared.", "ok");
+      });
+
+      els.output.addEventListener("input", () => {
+        const has = !!els.output.value;
+        els.copyBtn.disabled = !has;
+        els.clearBtn.disabled = !has;
+      });
+    }
+
+    // Boot
+    initUI();
+    checkWebGPU().then((gpu) => {
+      if (!gpu.ok) {
+        els.nowebgpu.classList.add("visible");
+        setStatus("WebGPU unavailable. Load is disabled until you switch browsers.", "error");
+        els.loadBtn.disabled = true;
+      } else {
+        setStatus("Ready to load a model.");
+      }
+    });
+  </script>
+</body>
+</html>
