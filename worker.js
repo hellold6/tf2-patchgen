@@ -138,8 +138,22 @@ self.onmessage = async ({ data }) => {
     const total = encoded.input_ids.dims[1];
     const positions =
       model.config.n_positions || model.config.max_position_embeddings || 1024;
+
+    // Prefer keeping the end of the prompt (header + seed). If max_new_tokens would
+    // leave fewer than 64 prompt positions, shrink max (and min) instead.
+    let maxNew = Math.max(1, Number(options.max_new_tokens) || 1);
+    let minNew = Math.max(0, Number(options.min_new_tokens) || 0);
+    let room = positions - maxNew;
+    if (room < 64) {
+      maxNew = Math.max(1, positions - 64);
+      room = positions - maxNew;
+    }
+    if (minNew > maxNew) minNew = maxNew;
+    options.max_new_tokens = maxNew;
+    options.min_new_tokens = minNew;
+
     // Keep the END of the prompt (new notes header) and drop early few-shots first.
-    const used = Math.min(total, context, positions - options.max_new_tokens);
+    const used = Math.min(total, context, room);
     if (used < 1) throw new Error("Prompt is too short after truncation.");
 
     const input_ids = encoded.input_ids.slice(null, [total - used, total]);
@@ -148,7 +162,13 @@ self.onmessage = async ({ data }) => {
       new BigInt64Array(used).fill(1n),
       [1, used]
     );
-    postMessage({ type: "context", total, used });
+    postMessage({
+      type: "context",
+      total,
+      used,
+      max_new_tokens: maxNew,
+      min_new_tokens: minNew,
+    });
 
     const streamer = new TextStreamer(tokenizer, {
       skip_prompt: true,
@@ -156,6 +176,9 @@ self.onmessage = async ({ data }) => {
       callback_function: (text) => postMessage({ type: "chunk", text }),
     });
 
+    // min_new_tokens ignores EOS until that many new tokens are produced, so a
+    // finished few-shot document cannot stop "huge" after two bullets.
+    // Stop still works via InterruptableStoppingCriteria (+ the forward yield).
     await model.generate({
       input_ids,
       attention_mask,

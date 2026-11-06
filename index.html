@@ -395,8 +395,12 @@
       { id: "Xenova/gpt2-medium", label: "GPT-2 medium (larger, slower)", approxMB: "~350 MB" },
     ];
 
-    // Length → max_new_tokens (leave room in GPT-2's 1024 context for the prompt)
-    const LENGTH_TOKENS = { short: 120, normal: 220, huge: 360 };
+    // Length → min/max new tokens (must fit GPT-2's 1024: prompt + max_new_tokens ≤ 1024)
+    const LENGTH_TOKENS = {
+      short:  { min_new_tokens: 80,  max_new_tokens: 150 },
+      normal: { min_new_tokens: 180, max_new_tokens: 280 },
+      huge:   { min_new_tokens: 360, max_new_tokens: 500 },
+    };
 
     // How many of the most recent prompt tokens to keep (worker also caps by 1024 - max_new_tokens)
     const CONTEXT_TOKENS = 768;
@@ -442,28 +446,37 @@ Updated localization
 November 28, 2023
 
 Gameplay updates
-- Changed cloak flicker timing so Spies are a hair easier to spot while bumping teammates
-- Added a brief footstep muffling window right after a successful backstab
-- Fixed players getting stuck in the resupply cabinet animation when spam-pressing E
+- Changed cloak flicker so Spies are easier to spot while bumping teammates
+- Added footstep muffling right after a successful backstab
+- Fixed getting stuck in the resupply cabinet when spam-pressing E
+- Updated Attack/Defend so the second point unlocks a beat sooner
+- Changed overtime bleed when both teams stand empty-handed
 
 Weapons
-- Updated the Knife: backstabs against airborne targets now play a slightly longer flourish
-- Changed the Ambassador: first accurate shot after zooming lands a touch sooner
-- Fixed the Dead Ringer not playing its warning beep after a fake death in water
-- Added a very rare line where the Spy apologizes to the corpse. He does not mean it.
+- Updated the Knife: airborne backstabs play a longer flourish
+- Changed the Ambassador: first zoomed accurate shot lands sooner
+- Fixed the Dead Ringer warning beep after a fake death in water
+- Added a rare Spy line apologizing to the corpse. He does not mean it.
+- Updated the Diamondback: rewarded crits clear after a round reset
 
 Bug fixes
-- Fixed the loadout screen preview spinning forever if you clicked cosmetics too fast
-- Fixed a case where stickybombs could attach to the Spy's cigarette and travel with him
-- Fixed tournament casters seeing the wrong disguise class icon
+- Fixed the loadout preview spinning if cosmetics were clicked too fast
+- Fixed stickybombs attaching to the Spy's cigarette and traveling with him
+- Fixed casters seeing the wrong disguise class icon in tournament mode
+- Fixed class select showing the wrong team colours after a scramble
+- Fixed a crash inspecting a Strange weapon as the counter rolled over
 
 Maps
-- Updated Turbine: added a small crate stack near mid so Scouts stop asking for cover that was never there
-- Fixed a pixel walk on Turbine's battlements that let Snipers see into RED spawn
+- Updated Turbine: added a mid crate stack Scouts kept asking for
+- Fixed a Turbine battlement pixel walk that saw into RED spawn
+- Updated Gorge: closed a final-hatch gap stickybombs hid in
+- Fixed a floating ammo pack on Barnblitz third
 
 Updated localization
 - Added translations for the Spy's rare apology line
-- Fixed an Italian string that accidentally called the Knife a spoon`;
+- Fixed an Italian string that called the Knife a spoon
+- Updated translations for the new point-unlock cue
+- Corrected a typo in the Diamondback kill feed string`;
 
     /* ============================================================
        DOM
@@ -589,11 +602,18 @@ Updated localization
       // Pick examples that match the chosen length so the model continues the pattern.
       let examples;
       if (length === "short") examples = [EXAMPLE_HOTFIX];
-      else if (length === "huge") examples = [EXAMPLE_NORMAL, EXAMPLE_HUGE];
+      else if (length === "huge") examples = [EXAMPLE_HUGE]; // one long doc — more room to generate
       else examples = [EXAMPLE_HOTFIX, EXAMPLE_NORMAL];
 
       // Light natural-language cue GPT-2 can imitate (kept short; format is shown by examples).
-      let cue = `// Another ${length === "short" ? "short hotfix" : length === "huge" ? "huge" : "normal"} Team Fortress 2 update`;
+      let cue;
+      if (length === "huge") {
+        cue = "// Another huge Team Fortress 2 update with many bullets across Gameplay updates, Weapons, Bug fixes, Maps, and Updated localization";
+      } else if (length === "short") {
+        cue = "// Another short hotfix Team Fortress 2 update";
+      } else {
+        cue = "// Another normal Team Fortress 2 update";
+      }
       if (focus) cue += ` focusing on ${focus}`;
       if (jokes) cue += ` with a joke entry or two`;
       cue += ".\n\n";
@@ -724,7 +744,8 @@ Updated localization
       lastPrompt = prompt;
 
       const temperature = Number(els.chaosSlider.value);
-      const max_new_tokens = LENGTH_TOKENS[els.lengthSelect.value] || 220;
+      const budget = LENGTH_TOKENS[els.lengthSelect.value] || LENGTH_TOKENS.normal;
+      const { min_new_tokens, max_new_tokens } = budget;
 
       streamBuffer = visibleSeedFromPrompt(prompt);
       els.output.value = streamBuffer;
@@ -737,6 +758,7 @@ Updated localization
         type: "generate",
         text: prompt,
         settings: {
+          min_new_tokens,
           max_new_tokens,
           temperature,
           top_k: 40,
