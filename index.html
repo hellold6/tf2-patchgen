@@ -623,20 +623,9 @@ Updated localization
       const header =
         `Team Fortress 2 Update Released\n${dateLabel}\n\n`;
 
-      // Seed so continuation stays in bullet style. Huge starts mid-list across sections.
-      let seed;
-      if (length === "short") {
-        seed = "Bug fixes\n-";
-      } else if (length === "huge") {
-        seed =
-          "Gameplay updates\n" +
-          "- Fixed \n" +
-          "- Added \n" +
-          "- Updated \n\n" +
-          "Weapons\n-";
-      } else {
-        seed = "Gameplay updates\n-";
-      }
+      // Seed a first section so continuation stays in bullet style (no empty verb stubs).
+      const seed =
+        length === "short" ? "Bug fixes\n-" : "Gameplay updates\n-";
 
       return cue + examples.join("\n\n") + "\n\n" + header + seed;
     }
@@ -651,6 +640,166 @@ Updated localization
     function countBullets(text) {
       return (String(text).match(/^\s*[-•]/gm) || []).length;
     }
+
+    /* Turn messy GPT-2 patch-note text into clean Valve-style bullets. Idempotent. */
+    function formatPatchNotes(text) {
+      const SECTIONS = [
+        "Gameplay updates",
+        "Weapons",
+        "Bug fixes",
+        "Maps",
+        "Updated localization",
+      ];
+      const VERB =
+        "Added|Removed|Fixed|Updated|Changed|Improved|Corrected|Correctly|Adjusted|Made|New";
+
+      let s = String(text ?? "");
+      s = s.replace(/\r\n/g, "\n").replace(/\u00a0/g, " ");
+
+      // Short bracket tags like [Fully updated]
+      s = s.replace(/\[[^\]]{0,60}\]/g, " ");
+
+      // Glued markers: +Added, *Removed, **Fixed, ***Made, ****Improved, *****Correctly
+      s = s.replace(new RegExp("[*+]{1,8}\\s*(" + VERB + ")\\b", "g"), "\n- $1");
+
+      // Verb after ], ), ., !, ;, :
+      s = s.replace(
+        new RegExp("([\\]).,!;:])\\s*[+*]?\\s*(" + VERB + ")\\b", "g"),
+        "$1\n- $2"
+      );
+
+      // Leftover asterisk/plus runs used as separators
+      s = s.replace(/[*+]{2,}/g, "\n");
+      s = s.replace(/(^|\s)[*+](?=\s*[A-Za-z])/g, "\n");
+      s = s.replace(/\*+/g, "");
+      s = s.replace(/(^|\n)\s*\+\s*/g, "$1");
+
+      // Normalize bullets
+      s = s.replace(/^\s*[-•–—]\s*/gm, "- ");
+
+      // Promote known section headers
+      for (const name of SECTIONS) {
+        const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        s = s.replace(new RegExp("(^|\\n)\\s*" + esc + "\\s*(?=\\n|$)", "gi"), "\n" + name + "\n");
+        s = s.replace(new RegExp("([^\\n])\\s+" + esc + "\\s*(?=\\n|-)", "gi"), "$1\n\n" + name + "\n");
+      }
+
+      // Lines starting with a verb become bullets
+      s = s.replace(new RegExp("(^|\\n)(?!- )(" + VERB + ")\\b", "g"), "$1- $2");
+
+      // Drop empty stub bullets ("- Fixed" with no text)
+      s = s.replace(new RegExp("^\\-\\s*(" + VERB + ")\\s*$", "gmi"), "");
+
+      const rawLines = s.split("\n").map((l) => l.trim());
+      const lines = [];
+      for (let line of rawLines) {
+        if (!line) {
+          lines.push("");
+          continue;
+        }
+        if (line.startsWith("- ")) {
+          line = "- " + line.slice(2).replace(/\s+/g, " ").trim();
+          if (new RegExp("^\\-\\s*(" + VERB + ")$", "i").test(line)) continue;
+          if (/^-\s*$/.test(line)) continue;
+        }
+        lines.push(line);
+      }
+
+      const TITLE = "Team Fortress 2 Update Released";
+      let title = TITLE;
+      let date = "";
+      let i = 0;
+      while (i < lines.length && !lines[i]) i++;
+      if (i < lines.length && /^Team Fortress 2 Update Released$/i.test(lines[i])) {
+        title = TITLE;
+        i++;
+      }
+      while (i < lines.length && !lines[i]) i++;
+      if (
+        i < lines.length &&
+        !lines[i].startsWith("- ") &&
+        !SECTIONS.some((n) => n.toLowerCase() === lines[i].toLowerCase())
+      ) {
+        if (/[A-Za-z]+\s+\d{1,2},\s*\d{4}/.test(lines[i]) || /^\d{4}-\d{2}-\d{2}$/.test(lines[i])) {
+          date = lines[i];
+          i++;
+        }
+      }
+
+      const sections = new Map();
+      let currentSection = null;
+      const ensure = (name) => {
+        if (!sections.has(name)) sections.set(name, []);
+        currentSection = name;
+      };
+      const orphanKey = "Gameplay updates";
+
+      for (; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line) continue;
+        const sectionHit = SECTIONS.find((n) => n.toLowerCase() === line.toLowerCase());
+        if (sectionHit) {
+          ensure(sectionHit);
+          continue;
+        }
+        if (line.startsWith("- ")) {
+          if (!currentSection) ensure(orphanKey);
+          const bullet = line.slice(2).trim();
+          if (!bullet) continue;
+          if (new RegExp("^(" + VERB + ")$", "i").test(bullet)) continue;
+          sections.get(currentSection).push(bullet);
+          continue;
+        }
+        if (!currentSection) ensure(orphanKey);
+        if (new RegExp("^(" + VERB + ")\\b", "i").test(line)) {
+          sections.get(currentSection).push(line.replace(/\s+/g, " ").trim());
+        } else {
+          const arr = sections.get(currentSection);
+          if (arr.length) {
+            arr[arr.length - 1] = (arr[arr.length - 1] + " " + line).replace(/\s+/g, " ").trim();
+          } else {
+            arr.push(line.replace(/\s+/g, " ").trim());
+          }
+        }
+      }
+
+      const out = [title];
+      if (date) out.push(date);
+      out.push("");
+
+      let firstSection = true;
+      const ordered = [
+        ...SECTIONS.filter((n) => sections.has(n) && sections.get(n).length),
+        ...[...sections.keys()].filter((n) => !SECTIONS.includes(n) && sections.get(n).length),
+      ];
+      for (const name of ordered) {
+        const bullets = sections.get(name) || [];
+        if (!bullets.length) continue;
+        if (!firstSection) out.push("");
+        firstSection = false;
+        out.push(name);
+        for (const b of bullets) out.push("- " + b);
+      }
+
+      let result = out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+      result = result.replace(
+        /^(Team Fortress 2 Update Released)\n([^\n]+)\n(?!\n)/,
+        "$1\n$2\n\n"
+      );
+      return result;
+    }
+
+    function showFormattedNotes() {
+      // Display a cleaned view of the raw stream without losing the raw buffer mid-token.
+      els.output.value = formatPatchNotes(streamBuffer);
+      els.output.scrollTop = els.output.scrollHeight;
+    }
+
+    function finalizeFormattedNotes() {
+      streamBuffer = formatPatchNotes(streamBuffer);
+      els.output.value = streamBuffer;
+    }
+
 
     /* ============================================================
        Worker lifecycle
@@ -715,8 +864,7 @@ Updated localization
         }
         if (data.type === "chunk" && generating) {
           streamBuffer += data.text;
-          els.output.value = streamBuffer;
-          els.output.scrollTop = els.output.scrollHeight;
+          showFormattedNotes();
           updateActionButtons();
         }
         if (data.type === "done") {
@@ -727,15 +875,16 @@ Updated localization
             pendingContinues = 0;
             generating = false;
             stopping = false;
+            finalizeFormattedNotes();
             setStatus("Stopped.", "ok");
             updateActionButtons();
             return;
           }
           // Huge length: if still thin on bullets, append the next section header and keep going.
-          if (continueQueue.length && countBullets(streamBuffer) < 10) {
+          if (continueQueue.length && countBullets(formatPatchNotes(streamBuffer)) < 10) {
             const next = continueQueue.shift();
             pendingContinues += 1;
-            streamBuffer += next;
+            streamBuffer = formatPatchNotes(streamBuffer) + next;
             els.output.value = streamBuffer;
             setStatus("Generating… (continuing sections)");
             const budget = LENGTH_TOKENS.huge;
@@ -758,6 +907,7 @@ Updated localization
           pendingContinues = 0;
           generating = false;
           stopping = false;
+          finalizeFormattedNotes();
           setStatus("Ready.", "ok");
           updateActionButtons();
         }
@@ -767,6 +917,7 @@ Updated localization
           generating = false;
           stopping = false;
           ready = !!data.loaded;
+          if (streamBuffer) finalizeFormattedNotes();
           setStatus(data.message, "error");
           updateActionButtons();
         }
