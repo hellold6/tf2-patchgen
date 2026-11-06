@@ -27,7 +27,7 @@
       --safe-right: env(safe-area-inset-right, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-left: env(safe-area-inset-left, 0px);
-      --action-h: 56px; /* sticky action bar height (approx) */
+      --action-h: 72px; /* fixed action bar height; JS may raise this */
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -55,8 +55,8 @@
       line-height: 1.45;
       min-height: 100vh;
       min-height: 100dvh;
-      /* leave room for sticky action bar + home indicator */
-      padding-bottom: calc(var(--action-h) + var(--safe-bottom) + 12px);
+      /* leave room so nothing scrolls under the fixed action bar */
+      padding-bottom: 0;
       overflow-x: hidden;
     }
     .wrap {
@@ -64,6 +64,13 @@
       margin: 0 auto;
       padding: calc(0.9rem + var(--safe-top)) calc(0.9rem + var(--safe-right)) 1rem calc(0.9rem + var(--safe-left));
       width: 100%;
+    }
+    /* Invisible spacer: reserves scroll room equal to the fixed bar */
+    .action-bar-spacer {
+      width: 100%;
+      height: calc(var(--action-h) + var(--safe-bottom) + 16px);
+      pointer-events: none;
+      flex-shrink: 0;
     }
     header h1 {
       font-size: 1.35rem;
@@ -213,26 +220,32 @@
       color: var(--danger);
     }
 
-    /* Sticky action bar — always reachable on phones */
+    /* Fixed bottom action bar — out of document flow, never overlaps mid-page */
     .action-bar {
       position: fixed;
       left: 0;
       right: 0;
       bottom: 0;
-      z-index: 40;
-      background: color-mix(in srgb, var(--card) 92%, transparent);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      z-index: 1000;
+      /* Solid (not translucent) so content underneath cannot show through */
+      background: var(--card);
       border-top: 1px solid var(--border);
-      padding: .55rem calc(0.75rem + var(--safe-right)) calc(0.55rem + var(--safe-bottom)) calc(0.75rem + var(--safe-left));
+      padding: .6rem calc(0.75rem + var(--safe-right)) calc(0.6rem + var(--safe-bottom)) calc(0.75rem + var(--safe-left));
       display: flex;
       gap: .5rem;
-      flex-wrap: wrap;
-      box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+      flex-wrap: nowrap;
+      align-items: stretch;
+      box-shadow: 0 -6px 20px rgba(0,0,0,.12);
+      /* Keep bar itself out of the scrollable layout */
+      margin: 0;
     }
-    .action-bar button { flex: 1 1 auto; }
-    .action-bar .primary,
-    .action-bar .danger { flex: 2 1 auto; }
+    .action-bar button {
+      flex: 1 1 0;
+      min-height: var(--tap);
+      font-size: 1rem;
+    }
+    .action-bar .primary { flex: 1.4 1 0; }
+    .action-bar .danger { flex: 1 1 0; }
 
     #status {
       font-size: .9rem;
@@ -391,10 +404,12 @@
       All notes are fictional and generated for fun.<br />
       This project is not affiliated with Valve Corporation or Team Fortress 2.
     </footer>
+    <!-- Pushes last content above the fixed Generate/Stop bar when scrolled to end -->
+    <div class="action-bar-spacer" aria-hidden="true"></div>
   </div>
 
-  <!-- Sticky primary actions for mobile reachability -->
-  <div class="action-bar" role="toolbar" aria-label="Generation controls">
+  <!-- Fixed bottom actions — position:fixed so they never sit mid-form -->
+  <div class="action-bar" id="actionBar" role="toolbar" aria-label="Generation controls">
     <button type="button" id="generateBtn" class="primary" disabled>Generate</button>
     <button type="button" id="stopBtn" class="danger" disabled>Stop</button>
   </div>
@@ -892,6 +907,23 @@ Updated localization
         els.clearBtn.disabled = !has;
       });
     }
+
+    /* Keep spacer in sync with the real fixed-bar height (wrap, safe-area, font scaling). */
+    function syncActionBarHeight() {
+      const bar = document.getElementById("actionBar");
+      if (!bar) return;
+      const h = Math.ceil(bar.getBoundingClientRect().height);
+      if (h > 0) {
+        document.documentElement.style.setProperty("--action-h", h + "px");
+      }
+    }
+    syncActionBarHeight();
+    window.addEventListener("resize", syncActionBarHeight);
+    try {
+      if (typeof ResizeObserver === "function") {
+        new ResizeObserver(syncActionBarHeight).observe(document.getElementById("actionBar"));
+      }
+    } catch (_) {}
 
     initUI();
     checkWebGPU().then((gpu) => {
